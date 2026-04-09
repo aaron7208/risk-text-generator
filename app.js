@@ -1,0 +1,3493 @@
+// 全局变量：当前选择的风险类型
+    let currentRiskType = '';
+    
+    // 家庭成员计数器（用于生成唯一 ID）
+    let familyMemberCount = 0;
+    
+    // 核查提示标记
+    let hasShownVerification = false;
+
+    /**
+     * ================================================
+     * 函数 1：selectRiskType
+     * 功能：选择风险类型，显示对应的输入区域
+     * 参数：riskType - 风险类型（medical/lowIncome/housing/disability）
+     * ================================================
+     */
+    function selectRiskType(riskType) {
+      currentRiskType = riskType;
+      
+      // 重置所有按钮样式
+      const buttons = document.querySelectorAll('.risk-type-btn');
+      buttons.forEach(function(btn) {
+        btn.classList.remove('border-blue-500', 'bg-blue-50');
+        btn.classList.add('border-gray-300');
+      });
+      
+      // 高亮选中的按钮
+      const selectedBtn = document.getElementById('btn-' + riskType);
+      selectedBtn.classList.remove('border-gray-300');
+      selectedBtn.classList.add('border-blue-500', 'bg-blue-50');
+      
+      // 显示已选择提示
+      const riskTypeNames = {
+        'medical': '医疗支出类',
+        'lowIncome': '新增低保类',
+        'housing': '住房安全类',
+        'disability': '新增残疾类'
+      };
+      document.getElementById('selectedRiskTypeName').textContent = riskTypeNames[riskType];
+      document.getElementById('selectedRiskType').classList.remove('hidden-section');
+      
+      // 根据风险类型显示区域
+      // 先隐藏所有区域
+      document.getElementById('housingSection').classList.add('hidden-section');
+      document.getElementById('disabilitySectionNew').classList.add('hidden-section');
+      document.getElementById('lowIncomeSectionNew').classList.add('hidden-section');
+      document.getElementById('basicInfoSection').classList.add('hidden-section');
+      document.getElementById('incomeSection').classList.add('hidden-section');
+      document.getElementById('expenseSection').classList.add('hidden-section');
+      document.getElementById('carefulSituationSection').classList.add('hidden-section');
+      
+      if (riskType === 'housing') {
+        // 住房安全类：只显示户主信息和住房信息
+        document.getElementById('basicInfoSection').classList.remove('hidden-section');
+        document.getElementById('housingSection').classList.remove('hidden-section');
+        // 滚动到基本信息区域
+        document.getElementById('basicInfoSection').scrollIntoView({ behavior: 'smooth' });
+      } else if (riskType === 'disability') {
+        // 残疾类：先显示残疾人信息，再显示家庭成员
+        document.getElementById('disabilitySectionNew').classList.remove('hidden-section');
+        document.getElementById('basicInfoSection').classList.remove('hidden-section');
+        document.getElementById('incomeSection').classList.remove('hidden-section');
+        document.getElementById('expenseSection').classList.remove('hidden-section');
+        document.getElementById('carefulSituationSection').classList.remove('hidden-section');
+        // 滚动到残疾人信息区域
+        document.getElementById('disabilitySectionNew').scrollIntoView({ behavior: 'smooth' });
+      } else if (riskType === 'lowIncome') {
+        // 低保类：先显示低保信息，再显示家庭成员
+        document.getElementById('lowIncomeSectionNew').classList.remove('hidden-section');
+        document.getElementById('basicInfoSection').classList.remove('hidden-section');
+        document.getElementById('incomeSection').classList.remove('hidden-section');
+        document.getElementById('expenseSection').classList.remove('hidden-section');
+        document.getElementById('carefulSituationSection').classList.remove('hidden-section');
+        // 滚动到低保信息区域
+        document.getElementById('lowIncomeSectionNew').scrollIntoView({ behavior: 'smooth' });
+      } else {
+        // 医疗支出类：正常显示所有区域
+        document.getElementById('basicInfoSection').classList.remove('hidden-section');
+        document.getElementById('incomeSection').classList.remove('hidden-section');
+        document.getElementById('expenseSection').classList.remove('hidden-section');
+        document.getElementById('carefulSituationSection').classList.remove('hidden-section');
+        // 滚动到基本信息区域
+        document.getElementById('basicInfoSection').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 2：addFamilyMember
+     * 功能：动态添加家庭成员输入框
+     * ================================================
+     */
+    function addFamilyMember() {
+      familyMemberCount++;
+      const container = document.getElementById('familyMembersContainer');
+      
+      // 创建家庭成员卡片
+      const memberDiv = document.createElement('div');
+      memberDiv.className = 'bg-gray-50 p-4 rounded-lg border-2 border-gray-200';
+      memberDiv.id = 'member-' + familyMemberCount;
+      
+      memberDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="font-semibold text-gray-700">成员 ${familyMemberCount}</h3>
+          <button onclick="removeFamilyMember(${familyMemberCount})" class="text-red-500 text-sm font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">姓名</label>
+            <input type="text" id="member${familyMemberCount}_name" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" placeholder="姓名" oninput="updateWorkIncomeNameOptions(); calculateLaborAbility(); generateReport()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">与户主关系</label>
+            <input type="text" id="member${familyMemberCount}_relation" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" placeholder="直接输入关系（如：户主、配偶、儿子等）" oninput="updateWorkIncomeNameOptions(); generateReport()" list="member${familyMemberCount}_relationList">
+            <datalist id="member${familyMemberCount}_relationList">
+              <option value="户主">
+              <option value="配偶">
+              <option value="儿子">
+              <option value="儿媳">
+              <option value="女儿">
+              <option value="女婿">
+              <option value="孙子">
+              <option value="孙女">
+              <option value="父亲">
+              <option value="母亲">
+              <option value="兄弟">
+              <option value="姐妹">
+              <option value="其他">
+            </datalist>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">年龄</label>
+            <input type="number" id="member${familyMemberCount}_age" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" placeholder="年龄" min="0" max="120" oninput="calculateLaborAbility(); generateReport()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">健康状况</label>
+            <select id="member${familyMemberCount}_health" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" onchange="calculateLaborAbility(); generateReport()">
+              <option value="健康">健康</option>
+              <option value="大病">大病（癌症、尿毒症等）</option>
+              <option value="慢性病">慢性病（糖尿病、高血压等）</option>
+              <option value="残疾">残疾</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- 25 岁以下成员显示学生身份选择 -->
+        <div id="member${familyMemberCount}_studentSection" class="mb-3 hidden-section">
+          <label class="block text-xs text-gray-600 mb-1">是否在校学生</label>
+          <select id="member${familyMemberCount}_isStudent" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" onchange="calculateLaborAbility(); generateReport()">
+            <option value="否">否</option>
+            <option value="是">是</option>
+          </select>
+        </div>
+        
+        <!-- 义务教育阶段选择（选择在校后显示） -->
+        <div id="member${familyMemberCount}_educationStageSection" class="mb-3 hidden-section">
+          <label class="block text-xs text-gray-600 mb-1">教育阶段</label>
+          <select id="member${familyMemberCount}_educationStage" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" onchange="generateReport()">
+            <option value="义务教育">义务教育阶段</option>
+            <option value="非义务教育">非义务教育阶段（高中、大学等）</option>
+          </select>
+        </div>
+        
+        <!-- 学校名称（非义务教育阶段显示） -->
+        <div id="member${familyMemberCount}_schoolNameSection" class="mb-3 hidden-section">
+          <label class="block text-xs text-gray-600 mb-1">学校名称</label>
+          <input type="text" id="member${familyMemberCount}_schoolName" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" placeholder="请输入学校名称" oninput="generateReport()">
+        </div>
+        
+        <div class="grid grid-cols-2 gap-2">
+          <div id="member${familyMemberCount}_laborContainer">
+            <label class="block text-xs text-gray-600 mb-1">劳动力情况</label>
+            <textarea
+              id="member${familyMemberCount}_labor"
+              class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-sm"
+              readonly
+              onfocus="this.blur()"
+              placeholder="将根据年龄和健康状况自动生成"
+              rows="2"
+              style="resize: none; line-height: 1.4;"
+            ></textarea>
+            <select
+              id="member${familyMemberCount}_laborSelect"
+              class="w-full px-3 py-2 border-2 border-blue-400 rounded-lg text-sm hidden-section"
+              onchange="selectLaborType(${familyMemberCount}, this.value)"
+            >
+              <option value="">请选择</option>
+              <option value="弱劳动力">弱劳动力</option>
+              <option value="丧失劳动力">丧失劳动力</option>
+            </select>
+          </div>
+
+          <div id="member${familyMemberCount}_maritalSection" class="hidden-section">
+            <label class="block text-xs text-gray-600 mb-1">婚育状况</label>
+            <div class="flex gap-1">
+              <select id="member${familyMemberCount}_marital" class="w-full px-2 py-2 border-2 border-gray-300 rounded-lg text-sm" onchange="generateReport()">
+                <option value="">选择</option>
+                <option value="离异">离异</option>
+                <option value="单身">单身</option>
+                <option value="丧偶">丧偶</option>
+              </select>
+              <button onclick="hideMaritalStatus(${familyMemberCount})" class="px-2 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600" title="隐藏婚育状况">×</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(memberDiv);
+      
+      // 添加成员后立即计算劳动力情况
+      setTimeout(function() {
+        calculateLaborAbility();
+      }, 100);
+    }
+
+    /**
+     * ================================================
+     * 函数 3：removeFamilyMember
+     * 功能：删除家庭成员
+     * 参数：memberId - 家庭成员 ID
+     * ================================================
+     */
+    function removeFamilyMember(memberId) {
+      const memberDiv = document.getElementById('member-' + memberId);
+      if (memberDiv) {
+        memberDiv.remove();
+        updateWorkIncomeNameOptions();
+        calculateLaborAbility();
+        generateReport();
+      }
+    }
+
+    // 务工收入计数器
+    let workIncomeCount = 0;
+    
+    // 生产经营收入计数器
+    let businessCount = 0;
+    
+    // 医疗支出计数器
+    let medicalExpenseCount = 0;
+    
+    // 教育支出计数器
+    let educationExpenseCount = 0;
+    
+    // 转移性收入计数器
+    let transferIncomeCount = 0;
+    
+    // 核实信息
+    let needVerification = false;
+    let verificationType = ''; // 'deposit' 或 'proxy'
+    let proxyCount = 0; // 代付人计数器
+    let verificationCompleted = false; // 核实完成标记
+    
+    // 城市数据（部分主要城市）
+    const cityData = {
+      '四川省': ['成都市', '绵阳市', '德阳市', '广元市', '遂宁市', '乐山市', '内江市', '南充市', '宜宾市', '广安市', '达州市', '雅安市', '巴中市', '资阳市', '阿坝州', '甘孜州', '凉山州', '泸州市', '自贡市', '攀枝花市'],
+      '北京市': ['东城区', '西城区', '朝阳区', '丰台区', '石景山区', '海淀区', '门头沟区', '房山区', '通州区', '顺义区', '昌平区', '大兴区', '怀柔区', '平谷区', '密云区', '延庆区'],
+      '天津市': ['和平区', '河东区', '河西区', '南开区', '河北区', '红桥区', '东丽区', '西青区', '津南区', '北辰区', '武清区', '宝坻区', '滨海新区', '宁河区', '静海区', '蓟州区'],
+      '上海市': ['黄浦区', '徐汇区', '长宁区', '静安区', '普陀区', '虹口区', '杨浦区', '闵行区', '宝山区', '嘉定区', '浦东新区', '金山区', '松江区', '青浦区', '奉贤区', '崇明区'],
+      '重庆市': ['万州区', '涪陵区', '渝中区', '大渡口区', '江北区', '沙坪坝区', '九龙坡区', '南岸区', '北碚区', '渝北区', '巴南区', '长寿区', '江津区', '合川区', '永川区', '南川区'],
+      '广东省': ['广州市', '深圳市', '珠海市', '汕头市', '佛山市', '韶关市', '湛江市', '肇庆市', '江门市', '茂名市', '惠州市', '梅州市', '汕尾市', '河源市', '阳江市', '清远市', '东莞市', '中山市', '潮州市', '揭阳市', '云浮市'],
+      '浙江省': ['杭州市', '宁波市', '温州市', '嘉兴市', '湖州市', '绍兴市', '金华市', '衢州市', '舟山市', '台州市', '丽水市'],
+      '江苏省': ['南京市', '无锡市', '徐州市', '常州市', '苏州市', '南通市', '连云港市', '淮安市', '盐城市', '扬州市', '镇江市', '泰州市', '宿迁市'],
+      '福建省': ['福州市', '厦门市', '莆田市', '三明市', '泉州市', '漳州市', '南平市', '龙岩市', '宁德市'],
+      '山东省': ['济南市', '青岛市', '淄博市', '枣庄市', '东营市', '烟台市', '潍坊市', '济宁市', '泰安市', '威海市', '日照市', '临沂市', '德州市', '聊城市', '滨州市', '菏泽市'],
+      '河北省': ['石家庄市', '唐山市', '秦皇岛市', '邯郸市', '邢台市', '保定市', '张家口市', '承德市', '沧州市', '廊坊市', '衡水市'],
+      '河南省': ['郑州市', '开封市', '洛阳市', '平顶山市', '安阳市', '鹤壁市', '新乡市', '焦作市', '濮阳市', '许昌市', '漯河市', '三门峡市', '南阳市', '商丘市', '信阳市', '周口市', '驻马店市'],
+      '湖北省': ['武汉市', '黄石市', '十堰市', '宜昌市', '襄阳市', '鄂州市', '荆门市', '孝感市', '荆州市', '黄冈市', '咸宁市', '随州市', '恩施州', '仙桃市', '潜江市', '天门市', '神农架林区'],
+      '湖南省': ['长沙市', '株洲市', '湘潭市', '衡阳市', '邵阳市', '岳阳市', '常德市', '张家界市', '益阳市', '郴州市', '永州市', '怀化市', '娄底市', '湘西州'],
+      '安徽省': ['合肥市', '芜湖市', '蚌埠市', '淮南市', '马鞍山市', '淮北市', '铜陵市', '安庆市', '黄山市', '滁州市', '阜阳市', '宿州市', '六安市', '亳州市', '池州市', '宣城市'],
+      '江西省': ['南昌市', '景德镇市', '萍乡市', '九江市', '新余市', '鹰潭市', '赣州市', '吉安市', '宜春市', '抚州市', '上饶市'],
+      '陕西省': ['西安市', '铜川市', '宝鸡市', '咸阳市', '渭南市', '延安市', '汉中市', '榆林市', '安康市', '商洛市'],
+      '辽宁省': ['沈阳市', '大连市', '鞍山市', '抚顺市', '本溪市', '丹东市', '锦州市', '营口市', '阜新市', '辽阳市', '盘锦市', '铁岭市', '朝阳市', '葫芦岛市'],
+      '吉林省': ['长春市', '吉林市', '四平市', '辽源市', '通化市', '白山市', '松原市', '白城市', '延边州'],
+      '黑龙江省': ['哈尔滨市', '齐齐哈尔市', '鸡西市', '鹤岗市', '双鸭山市', '大庆市', '伊春市', '佳木斯市', '七台河市', '牡丹江市', '黑河市', '绥化市', '大兴安岭地区'],
+      '贵州省': ['贵阳市', '六盘水市', '遵义市', '安顺市', '毕节市', '铜仁市', '黔西南州', '黔东南州', '黔南州'],
+      '云南省': ['昆明市', '曲靖市', '玉溪市', '保山市', '昭通市', '丽江市', '普洱市', '临沧市', '楚雄州', '红河州', '文山州', '西双版纳州', '大理州', '德宏州', '怒江州', '迪庆州'],
+      '甘肃省': ['兰州市', '嘉峪关市', '金昌市', '白银市', '天水市', '武威市', '张掖市', '平凉市', '酒泉市', '庆阳市', '定西市', '陇南市', '临夏州', '甘南州'],
+      '青海省': ['西宁市', '海东市', '海北州', '黄南州', '海南州', '果洛州', '玉树州', '海西州'],
+      '广西壮族自治区': ['南宁市', '柳州市', '桂林市', '梧州市', '北海市', '防城港市', '钦州市', '贵港市', '玉林市', '百色市', '贺州市', '河池市', '来宾市', '崇左市'],
+      '内蒙古自治区': ['呼和浩特市', '包头市', '乌海市', '赤峰市', '通辽市', '鄂尔多斯市', '呼伦贝尔市', '巴彦淖尔市', '乌兰察布市', '兴安盟', '锡林郭勒盟', '阿拉善盟'],
+      '新疆维吾尔自治区': ['乌鲁木齐市', '克拉玛依市', '吐鲁番市', '哈密市', '昌吉州', '博尔塔拉州', '巴音郭楞州', '阿克苏地区', '克孜勒苏州', '喀什地区', '和田地区', '伊犁州', '塔城地区', '阿勒泰地区'],
+      '西藏自治区': ['拉萨市', '日喀则市', '昌都市', '林芝市', '山南市', '那曲市', '阿里地区'],
+      '宁夏回族自治区': ['银川市', '石嘴山市', '吴忠市', '固原市', '中卫市'],
+      '山西省': ['太原市', '大同市', '阳泉市', '长治市', '晋城市', '朔州市', '晋中市', '运城市', '忻州市', '临汾市', '吕梁市'],
+      '海南省': ['海口市', '三亚市', '三沙市', '儋州市', '五指山市', '琼海市', '文昌市', '万宁市', '东方市', '定安县', '屯昌县', '澄迈县', '临高县', '白沙县', '昌江县', '乐东县', '陵水县', '保亭县', '琼中县']
+    };
+    
+    // 四川省各区县数据
+    const sichuanDistricts = {
+      '成都市': ['锦江区', '青羊区', '金牛区', '武侯区', '成华区', '龙泉驿区', '青白江区', '新都区', '温江区', '双流区', '郫都区', '简阳市', '都江堰市', '彭州市', '邛崃市', '崇州市', '金堂县', '大邑县', '蒲江县'],
+      '绵阳市': ['涪城区', '游仙区', '安州区', '江油市', '三台县', '盐亭县', '梓潼县', '北川县', '平武县'],
+      '德阳市': ['旌阳区', '广汉市', '什邡市', '绵竹市', '罗江区', '中江县'],
+      '广元市': ['利州区', '昭化区', '朝天区', '旺苍县', '青川县', '剑阁县', '苍溪县'],
+      '遂宁市': ['船山区', '安居区', '射洪市', '蓬溪县', '大英县'],
+      '乐山市': ['市中区', '沙湾区', '五通桥区', '金口河区', '峨眉山市', '犍为县', '井研县', '夹江县', '沐川县', '峨边县', '马边县'],
+      '内江市': ['市中区', '东兴区', '隆昌市', '资中县', '威远县'],
+      '南充市': ['顺庆区', '高坪区', '嘉陵区', '阆中市', '南部县', '营山县', '蓬安县', '仪陇县', '西充县'],
+      '宜宾市': ['翠屏区', '南溪区', '叙州区', '长宁县', '江安县', '高县', '珙县', '筠连县', '兴文县', '屏山县'],
+      '广安市': ['广安区', '前锋区', '华蓥市', '岳池县', '武胜县', '邻水县'],
+      '达州市': ['通川区', '达川区', '万源市', '宣汉县', '开江县', '大竹县', '渠县'],
+      '雅安市': ['雨城区', '名山区', '荥经县', '汉源县', '石棉县', '天全县', '芦山县', '宝兴县'],
+      '巴中市': ['巴州区', '恩阳区', '通江县', '南江县', '平昌县'],
+      '资阳市': ['雁江区', '安岳县', '乐至县'],
+      '阿坝州': ['马尔康市', '汶川县', '理县', '茂县', '松潘县', '九寨沟县', '金川县', '小金县', '黑水县', '壤塘县', '阿坝县', '若尔盖县', '红原县'],
+      '甘孜州': ['康定市', '泸定县', '丹巴县', '九龙县', '雅江县', '道孚县', '炉霍县', '甘孜县', '新龙县', '德格县', '白玉县', '石渠县', '色达县', '理塘县', '巴塘县', '乡城县', '稻城县', '得荣县'],
+      '凉山州': ['西昌市', '盐源县', '德昌县', '会理市', '会东县', '宁南县', '普格县', '布拖县', '金阳县', '昭觉县', '喜德县', '冕宁县', '越西县', '甘洛县', '美姑县', '雷波县', '木里县'],
+      '泸州市': ['江阳区', '纳溪区', '龙马潭区', '泸县', '合江县', '叙永县', '古蔺县'],
+      '自贡市': ['自流井区', '贡井区', '大安区', '沿滩区', '荣县', '富顺县'],
+      '攀枝花市': ['东区', '西区', '仁和区', '米易县', '盐边县']
+    };
+
+    /**
+     * ================================================
+     * 函数 2：updateWorkIncomeNameOptions
+     * 功能：更新所有务工记录中的人员选项（当家庭成员变化时调用）
+     * ================================================
+     */
+    function updateWorkIncomeNameOptions() {
+      // 获取家庭成员选项
+      let familyMemberOptions = '<option value="">请选择务工人员</option>';
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        if (nameInput && nameInput.value.trim()) {
+          const name = nameInput.value.trim();
+          const relation = relationInput ? relationInput.value : '成员';
+          familyMemberOptions += `<option value="${name}">${relation}-${name}</option>`;
+        }
+      }
+      
+      // 更新所有务工记录的人员选项
+      for (let i = 1; i <= workIncomeCount; i++) {
+        const nameSelect = document.getElementById('work' + i + '_name');
+        if (nameSelect) {
+          const currentValue = nameSelect.value;
+          nameSelect.innerHTML = familyMemberOptions;
+          // 保持原来选择的值
+          if (currentValue) {
+            nameSelect.value = currentValue;
+          }
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 25：checkFamilyCompleteness
+     * 功能：检查家庭成员完整性，提示补充配偶或婚育状况
+     * 
+     * 业务规则：
+     * 1. 统计家庭关系数量（儿子、女儿、儿媳、女婿、孙辈）
+     * 2. 通过数目匹配判断是否有"子女无配偶"的情况
+     * 3. 对每个成年人（≥18 岁且<60 岁）进行个人判定
+     * 4. 有子女 + 无配偶 → 需要核查婚育状况
+     * ================================================
+     */
+    function checkFamilyCompleteness() {
+      // 如果已经提示过，不再提示
+      if (hasShownVerification) {
+        return;
+      }
+      
+      // === 第 1 步：统计家庭关系数量 ===
+      let relations = {
+        '儿子': 0,
+        '女儿': 0,
+        '儿媳': 0,
+        '女婿': 0,
+        '孙子': 0,
+        '孙女': 0,
+        '外孙子': 0,
+        '外孙女': 0
+      };
+      
+      // 收集所有成员信息
+      let members = [];
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        const ageInput = document.getElementById('member' + i + '_age');
+        
+        if (!nameInput || !relationInput || !ageInput) continue;
+        
+        const name = nameInput.value.trim();
+        const relation = relationInput.value;
+        const age = parseInt(ageInput.value) || 0;
+        
+        if (!name || age === 0) continue;
+        
+        members.push({
+          id: i,
+          name: name,
+          relation: relation,
+          age: age
+        });
+        
+        // 统计关系数量
+        if (relations.hasOwnProperty(relation)) {
+          relations[relation]++;
+        }
+      }
+      
+      // === 第 2 步：判断家庭整体情况 ===
+      
+      // 儿子数量 > 儿媳数量 → 至少有一个儿子无配偶
+      let hasUnmarriedSon = (relations['儿子'] > relations['儿媳']);
+      
+      // 女儿数量 > 女婿数量 → 至少有一个女儿无配偶
+      let hasUnmarriedDaughter = (relations['女儿'] > relations['女婿']);
+      
+      // 有孙辈（孙子/孙女/外孙子/外孙女）
+      let hasGrandchildren = (relations['孙子'] + relations['孙女'] + 
+                              relations['外孙子'] + relations['外孙女']) > 0;
+      
+      // 有儿子辈（儿子 + 儿媳）
+      let hasSonGeneration = (relations['儿子'] + relations['儿媳']) > 0;
+      
+      // 有女儿辈（女儿 + 女婿）
+      let hasDaughterGeneration = (relations['女儿'] + relations['女婿']) > 0;
+      
+      // === 第 3 步：收集需要提示的成员 ===
+      let missingSpouseMembers = [];
+      
+      for (let i = 0; i < members.length; i++) {
+        const member = members[i];
+        
+        // 跳过未成年人（<18 岁）
+        if (member.age < 18) {
+          continue;
+        }
+        
+        // 跳过≥60 岁
+        if (member.age >= 60) {
+          continue;
+        }
+        
+        // 检查是否有配偶
+        let hasSpouse = false;
+        for (let j = 0; j < members.length; j++) {
+          const otherMember = members[j];
+          if (otherMember.relation === '配偶' && Math.abs(otherMember.age - member.age) <= 15) {
+            hasSpouse = true;
+            break;
+          }
+        }
+        
+        // 如果已有配偶，不需要核查
+        if (hasSpouse) {
+          continue;
+        }
+        
+        // === 第 4 步：判断该成员是否有子女 ===
+        let hasOwnChildren = checkHasChildren(member, relations, hasUnmarriedSon, hasUnmarriedDaughter, hasGrandchildren, hasSonGeneration, hasDaughterGeneration);
+        
+        // 有子女 + 无配偶 → 需要核查
+        if (hasOwnChildren) {
+          missingSpouseMembers.push({
+            id: member.id,
+            name: member.name,
+            age: member.age,
+            relation: member.relation,
+            hasOwnChildren: hasOwnChildren
+          });
+        }
+      }
+      
+      // === 第 5 步：如果有需要提示的成员，显示弹窗 ===
+      if (missingSpouseMembers.length > 0) {
+        console.log('=== 婚育状况核查触发 ===');
+        console.log('待核查成员:', missingSpouseMembers);
+        showFamilyVerificationDialog(missingSpouseMembers);
+        hasShownVerification = true;
+      } else {
+        console.log('=== 婚育状况核查未触发 ===');
+        console.log('relations:', relations);
+        console.log('hasUnmarriedSon:', hasUnmarriedSon);
+        console.log('hasUnmarriedDaughter:', hasUnmarriedDaughter);
+        console.log('hasGrandchildren:', hasGrandchildren);
+        console.log('members:', members);
+      }
+    }
+
+    /**
+     * ================================================
+     * 辅助函数：checkHasChildren
+     * 功能：判断某个成员是否有子女
+     * 参数：member - 成员对象，relations - 关系统计，hasUnmarriedSon/hasUnmarriedDaughter - 是否有未婚子女，hasGrandchildren - 是否有孙辈
+     * ================================================
+     */
+    function checkHasChildren(member, relations, hasUnmarriedSon, hasUnmarriedDaughter, hasGrandchildren, hasSonGeneration, hasDaughterGeneration) {
+      const relation = member.relation;
+      
+      // 户主/配偶：家中有儿子/女儿 → 有子女
+      if (relation === '户主' || relation === '配偶') {
+        return hasSonGeneration || hasDaughterGeneration;
+      }
+      
+      // 儿子：
+      if (relation === '儿子') {
+        // 如果儿子数量 > 儿媳数量，且有孙辈 → 推断无配偶的儿子有子女
+        if (hasUnmarriedSon && hasGrandchildren) {
+          // 进一步判断：有孙子/孙女（儿子的孩子）
+          if ((relations['孙子'] + relations['孙女']) > 0) {
+            return true;
+          }
+        }
+        return false;
+      }
+      
+      // 女儿：
+      if (relation === '女儿') {
+        // 如果女儿数量 > 女婿数量，且有孙辈 → 推断无配偶的女儿有子女
+        if (hasUnmarriedDaughter && hasGrandchildren) {
+          // 进一步判断：有外孙子/外孙女（女儿的孩子）
+          if ((relations['外孙子'] + relations['外孙女']) > 0) {
+            return true;
+          }
+        }
+        return false;
+      }
+      
+      // 其他关系（儿媳、女婿等）：暂不核查
+      return false;
+    }
+
+    /**
+     * ================================================
+     * 函数 26：showFamilyVerificationDialog
+     * 功能：显示家庭成员完整性核查对话框
+     * 参数：members - 需要补充的成员数组
+     * ================================================
+     */
+    function showFamilyVerificationDialog(members) {
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'familyVerificationOverlay';
+      
+      // 生成成员列表 HTML
+      let membersHtml = '';
+      members.forEach(function(member, index) {
+        membersHtml += `
+          <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-2">
+            <p class="text-sm text-gray-700">
+              <strong>${member.relation}${member.name}</strong>，${member.age}岁
+            </p>
+            <div class="mt-2 flex gap-2">
+              <button onclick="addMissingMember(${index})" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors font-semibold">
+                补充家庭成员
+              </button>
+              <button onclick="showMaritalForMissingAndScroll(${member.id})" class="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors font-semibold">
+                补充婚育状况
+              </button>
+            </div>
+          </div>
+        `;
+      });
+      
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+          <div class="text-center mb-4">
+            <div class="text-6xl mb-2">👨‍👩‍👧‍👦</div>
+            <h3 class="text-xl font-bold text-gray-800">家庭成员完整性核查</h3>
+            <p class="text-sm text-gray-600 mt-2">以下成员婚育状况存疑</p>
+          </div>
+          
+          ${membersHtml}
+          
+          <div class="mt-4 pt-4 border-t border-gray-200">
+            <button onclick="closeFamilyVerification()" class="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors">
+              跳过（不再提示）
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+    }
+
+    /**
+     * ================================================
+     * 函数 27：addMissingMember
+     * 功能：添加缺失的家庭成员（占位，实际由用户手动添加）
+     * 参数：memberIndex - 成员索引
+     * ================================================
+     */
+    function addMissingMember(memberIndex) {
+      // 关闭弹窗，用户手动添加
+      closeFamilyVerification();
+      // 滚动到家庭成员区域
+      const basicInfoSection = document.getElementById('basicInfoSection');
+      if (basicInfoSection) {
+        basicInfoSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 28：showMaritalForMissing
+     * 功能：为缺失配偶的成员显示婚育状况
+     * 参数：memberId - 家庭成员 ID
+     * ================================================
+     */
+    function showMaritalForMissing(memberId) {
+      showMaritalStatus(memberId);
+      closeFamilyVerification();
+    }
+
+    /**
+     * ================================================
+     * 函数 28.5：showMaritalForMissingAndScroll
+     * 功能：为缺失配偶的成员显示婚育状况并滚动到该成员处
+     * 参数：memberId - 家庭成员 ID
+     * ================================================
+     */
+    function showMaritalForMissingAndScroll(memberId) {
+      // 先显示婚育状况字段
+      showMaritalStatus(memberId);
+      
+      // 关闭弹窗
+      closeFamilyVerification();
+      
+      // 延迟滚动，确保 DOM 已更新
+      setTimeout(function() {
+        const memberCard = document.getElementById('member-' + memberId);
+        if (memberCard) {
+          memberCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // 添加高亮效果（2 秒后消失）
+          memberCard.style.transition = 'box-shadow 0.3s, transform 0.3s';
+          memberCard.style.boxShadow = '0 0 20px rgba(147, 51, 234, 0.5)';
+          memberCard.style.transform = 'scale(1.02)';
+          
+          setTimeout(function() {
+            memberCard.style.boxShadow = '';
+            memberCard.style.transform = '';
+          }, 2000);
+        }
+      }, 300);
+    }
+
+    /**
+     * ================================================
+     * 函数 29：closeFamilyVerification
+     * 功能：关闭家庭成员完整性核查对话框
+     * ================================================
+     */
+    function closeFamilyVerification() {
+      const overlay = document.getElementById('familyVerificationOverlay');
+      if (overlay) {
+        overlay.remove();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 3：updateCityOptions
+     * 功能：根据选择的省份更新城市选项，并控制县区字段显示/隐藏，更新区县选项
+     * 参数：recordId - 务工记录 ID
+     * ================================================
+     */
+    function updateCityOptions(recordId) {
+      const provinceSelect = document.getElementById('work' + recordId + '_province');
+      const citySelect = document.getElementById('work' + recordId + '_city');
+      const districtSelect = document.getElementById('work' + recordId + '_district');
+      const districtSection = document.getElementById('work' + recordId + '_districtSection');
+      const province = provinceSelect.value;
+      
+      // 清空城市选项
+      citySelect.innerHTML = '<option value="">请选择城市</option>';
+      
+      // 清空区县选项
+      if (districtSelect) {
+        districtSelect.innerHTML = '<option value="">请选择区县</option>';
+      }
+      
+      // 四川省内显示县区字段，省外隐藏
+      if (province === '四川省') {
+        if (districtSection) {
+          districtSection.style.display = 'block';
+        }
+        // 如果是四川省，添加区县下拉选项
+        if (districtSelect) {
+          districtSelect.outerHTML = `
+            <select id="work${recordId}_district" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="checkWorkIncome(); generateReport()">
+              <option value="">请选择区县</option>
+            </select>
+          `;
+        }
+      } else {
+        if (districtSection) {
+          districtSection.style.display = 'none';
+        }
+      }
+      
+      // 添加城市选项
+      if (province && cityData[province]) {
+        cityData[province].forEach(function(city) {
+          const option = document.createElement('option');
+          option.value = city;
+          option.textContent = city;
+          citySelect.appendChild(option);
+        });
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 4：updateDistrictOptions
+     * 功能：根据选择的城市更新区县选项（仅四川省）
+     * 参数：recordId - 务工记录 ID
+     * ================================================
+     */
+    function updateDistrictOptions(recordId) {
+      const citySelect = document.getElementById('work' + recordId + '_city');
+      const districtSelect = document.getElementById('work' + recordId + '_district');
+      const city = citySelect.value;
+      
+      // 清空区县选项
+      if (districtSelect) {
+        districtSelect.innerHTML = '<option value="">请选择区县</option>';
+        
+        // 添加区县选项
+        if (city && sichuanDistricts[city]) {
+          sichuanDistricts[city].forEach(function(district) {
+            const option = document.createElement('option');
+            option.value = district;
+            option.textContent = district;
+            districtSelect.appendChild(option);
+          });
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 5：addWorkIncome
+     * 功能：添加务工收入记录
+     * ================================================
+     */
+    function addWorkIncome() {
+      // 检查家庭成员完整性
+      checkFamilyCompleteness();
+      
+      workIncomeCount++;
+      const container = document.getElementById('workIncomeContainer');
+      
+      const workDiv = document.createElement('div');
+      workDiv.className = 'bg-gray-50 p-3 rounded-lg border-2 border-gray-200';
+      workDiv.id = 'work-' + workIncomeCount;
+      
+      // 获取家庭成员选项
+      let familyMemberOptions = '<option value="">请选择务工人员</option>';
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        if (nameInput && nameInput.value.trim()) {
+          const name = nameInput.value.trim();
+          const relation = relationInput ? relationInput.value : '成员';
+          familyMemberOptions += `<option value="${name}">${relation}-${name}</option>`;
+        }
+      }
+      
+      workDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-semibold text-gray-700 text-sm">务工记录 ${workIncomeCount}</h4>
+          <button onclick="removeWorkIncome(${workIncomeCount})" class="text-red-500 text-xs font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="mb-2">
+          <label class="block text-xs text-gray-600 mb-1">务工人员</label>
+          <select id="work${workIncomeCount}_name" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" onchange="calculateWorkTotal()">
+            ${familyMemberOptions}
+          </select>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">务工省份</label>
+            <select id="work${workIncomeCount}_province" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="updateCityOptions(${workIncomeCount}); checkWorkIncome(); generateReport()">
+              <option value="">请选择省份</option>
+              <option value="四川省">四川省</option>
+              <option value="北京市">北京市</option>
+              <option value="天津市">天津市</option>
+              <option value="上海市">上海市</option>
+              <option value="重庆市">重庆市</option>
+              <option value="河北省">河北省</option>
+              <option value="山西省">山西省</option>
+              <option value="辽宁省">辽宁省</option>
+              <option value="吉林省">吉林省</option>
+              <option value="黑龙江省">黑龙江省</option>
+              <option value="江苏省">江苏省</option>
+              <option value="浙江省">浙江省</option>
+              <option value="安徽省">安徽省</option>
+              <option value="福建省">福建省</option>
+              <option value="江西省">江西省</option>
+              <option value="山东省">山东省</option>
+              <option value="河南省">河南省</option>
+              <option value="湖北省">湖北省</option>
+              <option value="湖南省">湖南省</option>
+              <option value="广东省">广东省</option>
+              <option value="海南省">海南省</option>
+              <option value="贵州省">贵州省</option>
+              <option value="云南省">云南省</option>
+              <option value="陕西省">陕西省</option>
+              <option value="甘肃省">甘肃省</option>
+              <option value="青海省">青海省</option>
+              <option value="内蒙古自治区">内蒙古自治区</option>
+              <option value="广西壮族自治区">广西壮族自治区</option>
+              <option value="西藏自治区">西藏自治区</option>
+              <option value="宁夏回族自治区">宁夏回族自治区</option>
+              <option value="新疆维吾尔自治区">新疆维吾尔自治区</option>
+            </select>
+          </div>
+        
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">务工城市</label>
+            <select id="work${workIncomeCount}_city" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="updateDistrictOptions(${workIncomeCount}); checkWorkIncome(); generateReport()">
+              <option value="">请先选择省份</option>
+            </select>
+          </div>
+          
+          <div id="work${workIncomeCount}_districtSection" style="display: none;">
+            <label class="block text-xs text-gray-600 mb-1">务工县区</label>
+            <select id="work${workIncomeCount}_district" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="checkWorkIncome(); generateReport()">
+              <option value="">请选择区县</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">起始时间</label>
+            <input type="month" id="work${workIncomeCount}_startTime" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="validateMonthInput(this); checkWorkIncome(); calculateWorkTotal()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">截止时间</label>
+            <input type="month" id="work${workIncomeCount}_endTime" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="validateMonthInput(this); checkWorkIncome(); calculateWorkTotal()">
+          </div>
+        </div>
+        
+        <div class="mb-2">
+          <label class="block text-xs text-gray-600 mb-1">从事行业</label>
+          <input type="text" id="work${workIncomeCount}_industry" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" placeholder="例：建筑工地、电子厂、餐饮服务等" oninput="generateReport()">
+        </div>
+        
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">总收入（元）</label>
+          <input type="number" id="work${workIncomeCount}_amount" step="0.01" min="0" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0.00" onchange="checkWorkIncome(); calculateWorkTotal()">
+        </div>
+        
+        <div class="mt-2 p-2 bg-blue-50 rounded text-xs">
+          <p class="text-gray-600">
+            务工时长：<span id="work${workIncomeCount}_duration" class="font-semibold">0</span> 个月
+            <span id="work${workIncomeCount}_monthlyWarning" class="text-red-600 font-semibold ml-2 hidden"></span>
+          </p>
+        </div>
+      `;
+      
+      container.appendChild(workDiv);
+    }
+
+    /**
+     * ================================================
+     * 函数 4：removeWorkIncome
+     * 功能：删除务工收入记录
+     * ================================================
+     */
+    function removeWorkIncome(workId) {
+      const workDiv = document.getElementById('work-' + workId);
+      if (workDiv) {
+        workDiv.remove();
+        calculateWorkTotal();
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 17：toggleTransferSection
+     * 功能：切换转移性收入面板显示/隐藏
+     * ================================================
+     */
+    function toggleTransferSection() {
+      const container = document.getElementById('transferIncomeContainer');
+      
+      // 展开容器并添加记录
+      container.classList.remove('hidden-section');
+      
+      // 检查家庭成员完整性
+      checkFamilyCompleteness();
+      
+      // 添加一条新记录
+      addTransferIncome();
+    }
+
+    /**
+     * ================================================
+     * 函数 5：addTransferIncome
+     * 功能：添加转移性收入记录
+     * ================================================
+     */
+    function addTransferIncome() {
+      transferIncomeCount++;
+      const container = document.getElementById('transferIncomeContainer');
+      
+      const transferDiv = document.createElement('div');
+      transferDiv.className = 'bg-gray-50 p-3 rounded-lg border-2 border-gray-200';
+      transferDiv.id = 'transfer-' + transferIncomeCount;
+      
+      // 获取家庭成员选项
+      let familyMemberOptions = '<option value="">请选择家庭成员</option>';
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        if (nameInput && nameInput.value.trim()) {
+          const name = nameInput.value.trim();
+          const relation = relationInput ? relationInput.value : '成员';
+          familyMemberOptions += `<option value="${name}">${relation}-${name}</option>`;
+        }
+      }
+      
+      transferDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-2">
+          <h4 class="font-semibold text-gray-700 text-sm">转移收入 ${transferIncomeCount}</h4>
+          <button onclick="removeTransferIncome(${transferIncomeCount})" class="text-red-500 text-xs font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">受益人</label>
+            <select id="transfer${transferIncomeCount}_name" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="calculateTransferTotal()">
+              ${familyMemberOptions}
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">收入类型</label>
+            <select id="transfer${transferIncomeCount}_type" class="w-full px-2 py-2 md:py-1 border border-gray-300 rounded text-base md:text-sm" onchange="toggleTransferOther(${transferIncomeCount}); generateReport()">
+              <option value="">请选择类型</option>
+              <option value="低保金">低保金</option>
+              <option value="养老金">养老金</option>
+              <option value="残疾人补贴">残疾人补贴</option>
+              <option value="地力补贴">地力补贴</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- 其他收入类型输入框（选择"其他"时显示） -->
+        <div id="transfer${transferIncomeCount}_otherSection" class="mb-2 hidden-section">
+          <label class="block text-xs text-gray-600 mb-1">具体类型</label>
+          <input type="text" id="transfer${transferIncomeCount}_otherText" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" placeholder="例：临时救助金、助学补贴等" oninput="generateReport()">
+        </div>
+        
+        <div>
+          <label class="block text-xs text-gray-600 mb-1">金额（元）</label>
+          <input type="number" id="transfer${transferIncomeCount}_amount" step="0.01" min="0" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0.00" oninput="calculateTransferTotal()">
+        </div>
+      `;
+      
+      container.appendChild(transferDiv);
+    }
+
+    /**
+     * ================================================
+     * 函数 6：toggleTransferOther
+     * 功能：切换"其他"转移性收入类型的输入框显示/隐藏
+     * 参数：recordId - 转移收入记录 ID
+     * ================================================
+     */
+    function toggleTransferOther(recordId) {
+      const typeSelect = document.getElementById('transfer' + recordId + '_type');
+      const otherSection = document.getElementById('transfer' + recordId + '_otherSection');
+      const type = typeSelect ? typeSelect.value : '';
+      
+      if (type === '其他') {
+        if (otherSection) {
+          otherSection.classList.remove('hidden-section');
+        }
+      } else {
+        if (otherSection) {
+          otherSection.classList.add('hidden-section');
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 7：removeTransferIncome
+     * 功能：删除转移性收入记录
+     * ================================================
+     */
+    function removeTransferIncome(transferId) {
+      const transferDiv = document.getElementById('transfer-' + transferId);
+      if (transferDiv) {
+        transferDiv.remove();
+        calculateTransferTotal();
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 8：calculateTransferTotal
+     * 功能：计算转移性收入合计
+     * ================================================
+     */
+    function calculateTransferTotal() {
+      let total = 0;
+      for (let i = 1; i <= transferIncomeCount; i++) {
+        const amountInput = document.getElementById('transfer' + i + '_amount');
+        if (amountInput) {
+          total += parseFloat(amountInput.value) || 0;
+        }
+      }
+      document.getElementById('incomeTransferTotal').value = total;
+      document.getElementById('incomeTransferTotalDisplay').textContent = total.toFixed(2);
+      generateReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 8：calculateWorkTotal
+     * 功能：计算务工收入合计，并计算务工时长（自动计算一年内的收入）
+     * ================================================
+     */
+    function calculateWorkTotal() {
+      let total = 0;
+      const oneYearAgo = getOneYearAgo(); // 一年前的月份
+      const currentMonth = getCurrentYearMonth(); // 当前月份
+      
+      for (let i = 1; i <= workIncomeCount; i++) {
+        const amountInput = document.getElementById('work' + i + '_amount');
+        const startTimeInput = document.getElementById('work' + i + '_startTime');
+        const endTimeInput = document.getElementById('work' + i + '_endTime');
+        const durationSpan = document.getElementById('work' + i + '_duration');
+        
+        if (amountInput && startTimeInput && endTimeInput) {
+          const amount = parseFloat(amountInput.value) || 0;
+          const startTime = startTimeInput.value;
+          const endTime = endTimeInput.value;
+          
+          // 计算实际务工月数（在一年内）
+          if (startTime && endTime) {
+            const start = new Date(startTime);
+            const end = new Date(endTime);
+            const oneYearAgoDate = new Date(oneYearAgo);
+            const currentMonthDate = new Date(currentMonth);
+            
+            // 调整起始时间和截止时间在一年范围内
+            const actualStart = start < oneYearAgoDate ? oneYearAgoDate : start;
+            const actualEnd = end > currentMonthDate ? currentMonthDate : end;
+            
+            // 计算实际月数
+            const actualMonths = (actualEnd.getFullYear() - actualStart.getFullYear()) * 12 + 
+                                (actualEnd.getMonth() - actualStart.getMonth()) + 1;
+            
+            if (actualMonths > 0) {
+              durationSpan.textContent = actualMonths;
+              
+              // 计算月收入并乘以实际月数
+              const totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + 
+                                 (end.getMonth() - start.getMonth()) + 1;
+              if (totalMonths > 0) {
+                const monthlyIncome = amount / totalMonths;
+                total += monthlyIncome * actualMonths;
+              }
+            } else {
+              durationSpan.textContent = '0';
+            }
+          } else {
+            durationSpan.textContent = '0';
+          }
+        }
+      }
+      document.getElementById('incomeWorkTotal').value = total;
+      document.getElementById('incomeWorkTotalDisplay').textContent = formatAmount(total);
+      generateReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 6：checkWorkIncome
+     * 功能：检查务工收入是否过低（省外月薪低于 2000 元）
+     * ================================================
+     */
+    function checkWorkIncome() {
+      for (let i = 1; i <= workIncomeCount; i++) {
+        const provinceInput = document.getElementById('work' + i + '_province');
+        const startTimeInput = document.getElementById('work' + i + '_startTime');
+        const endTimeInput = document.getElementById('work' + i + '_endTime');
+        const amountInput = document.getElementById('work' + i + '_amount');
+        const monthlyWarningSpan = document.getElementById('work' + i + '_monthlyWarning');
+        
+        if (!provinceInput || !startTimeInput || !endTimeInput || !amountInput || !monthlyWarningSpan) continue;
+        
+        const province = provinceInput.value;
+        const startTime = startTimeInput.value;
+        const endTime = endTimeInput.value;
+        const amount = parseFloat(amountInput.value) || 0;
+        
+        // 只检查四川省外务工
+        if (province && province !== '四川省' && startTime && endTime && amount > 0) {
+          const start = new Date(startTime);
+          const end = new Date(endTime);
+          const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+          
+          if (months > 0) {
+            const monthlyIncome = amount / months;
+            
+            // 检查是否超过 1 年
+            if (months > 12) {
+              alert(`⚠️ 提示：务工记录 ${i} 的时间跨度为${months}个月，超过 1 年。请确保数据准确，如确属实际情况，请修改截止时间。`);
+              endTimeInput.value = '';
+              return;
+            }
+            
+            // 检查月薪是否低于 2000 元
+            if (monthlyIncome < 2000) {
+              showWorkIncomeWarning(i, amount, months, monthlyIncome);
+            } else {
+              monthlyWarningSpan.classList.add('hidden');
+            }
+          }
+        } else {
+          monthlyWarningSpan.classList.add('hidden');
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 7：showWorkIncomeWarning
+     * 功能：显示务工收入过低警告弹窗（居中显示）
+     * ================================================
+     */
+    function showWorkIncomeWarning(recordId, totalIncome, months, monthlyIncome) {
+      // 创建遮罩层
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'workIncomeWarningOverlay';
+      
+      // 创建弹窗内容
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl transform transition-all">
+          <!-- 警告图标 -->
+          <div class="text-center mb-4">
+            <div class="text-6xl mb-2">⚠️</div>
+            <h3 class="text-xl font-bold text-gray-800">温馨提示</h3>
+          </div>
+          
+          <!-- 提示信息 -->
+          <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
+            <p class="text-gray-700 text-sm leading-relaxed">
+              务工记录 ${recordId} 的务工时长为 <strong class="text-blue-600">${months}个月</strong>，
+              总收入为 <strong class="text-red-600">${totalIncome.toFixed(2)}元</strong>，
+              月均收入约为 <strong class="text-red-600">${monthlyIncome.toFixed(2)}元</strong>。
+            </p>
+            <p class="text-gray-600 text-xs mt-2">
+              💡 提示：四川省外务工人员月均收入一般不低于 2000 元。请您再次确认数据是否准确，如确属实际情况，请点击"确认无误"继续。
+            </p>
+          </div>
+          
+          <!-- 按钮组 -->
+          <div class="flex gap-3">
+            <button 
+              onclick="closeWorkIncomeWarning(${recordId}, true)" 
+              class="flex-1 bg-green-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-green-700 transition-colors"
+            >
+              ✓ 确认无误
+            </button>
+            <button 
+              onclick="closeWorkIncomeWarning(${recordId}, false)" 
+              class="flex-1 bg-gray-300 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-400 transition-colors"
+            >
+              ✎ 修改数据
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+    }
+
+    /**
+     * ================================================
+     * 函数 8：closeWorkIncomeWarning
+     * 功能：关闭务工收入警告弹窗
+     * 参数：recordId - 务工记录 ID，confirmed - 是否确认无误
+     * ================================================
+     */
+    function closeWorkIncomeWarning(recordId, confirmed) {
+      // 移除弹窗
+      const overlay = document.getElementById('workIncomeWarningOverlay');
+      if (overlay) {
+        overlay.remove();
+      }
+      
+      // 如果用户选择修改，清空截止时间和收入
+      if (!confirmed) {
+        const endTimeInput = document.getElementById('work' + recordId + '_endTime');
+        const amountInput = document.getElementById('work' + recordId + '_amount');
+        if (endTimeInput) endTimeInput.value = '';
+        if (amountInput) amountInput.value = '';
+        
+        // 清空时长显示
+        const durationSpan = document.getElementById('work' + recordId + '_duration');
+        if (durationSpan) durationSpan.textContent = '0';
+      }
+      
+      // 重新计算
+      calculateWorkTotal();
+      generateReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 12：toggleBusinessSection
+     * 功能：切换生产经营收入面板显示/隐藏
+     * ================================================
+     */
+    function toggleBusinessSection() {
+      const container = document.getElementById('businessContainer');
+      
+      // 展开容器并添加记录
+      container.classList.remove('hidden-section');
+      
+      // 检查家庭成员完整性
+      checkFamilyCompleteness();
+      
+      // 添加一条新记录
+      addBusinessRecord();
+    }
+
+    /**
+     * ================================================
+     * 函数 13：addBusinessRecord
+     * 功能：添加生产经营记录
+     * ================================================
+     */
+    function addBusinessRecord() {
+      businessCount++;
+      const container = document.getElementById('businessContainer');
+      
+      // 获取无务工记录的劳动力选项
+      let laborOptions = '<option value="">请选择从事生产经营的人员</option>';
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        const laborInput = document.getElementById('member' + i + '_labor');
+        
+        if (nameInput && laborInput) {
+          const name = nameInput.value.trim();
+          const relation = relationInput ? relationInput.value : '成员';
+          const labor = laborInput.value;
+          
+          // 有劳动力能力且没有务工记录
+          if (name && labor && labor.includes('劳动力') && !labor.includes('无')) {
+            // 检查是否已有务工记录
+            let hasWorkRecord = false;
+            for (let j = 1; j <= workIncomeCount; j++) {
+              const workNameInput = document.getElementById('work' + j + '_name');
+              if (workNameInput && workNameInput.value === name) {
+                hasWorkRecord = true;
+                break;
+              }
+            }
+            if (!hasWorkRecord) {
+              laborOptions += `<option value="${name}">${relation}-${name}</option>`;
+            }
+          }
+        }
+      }
+      
+      const businessDiv = document.createElement('div');
+      businessDiv.className = 'bg-orange-50 p-4 rounded-lg border-2 border-orange-200';
+      businessDiv.id = 'business-' + businessCount;
+      
+      businessDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="font-semibold text-gray-700">生产经营记录 ${businessCount}</h4>
+          <button onclick="removeBusinessRecord(${businessCount})" class="text-red-500 text-sm font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">从事人员</label>
+            <select id="business${businessCount}_person" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" onchange="generateReport()">
+              ${laborOptions}
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">生产经营方式</label>
+            <select id="business${businessCount}_type" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" onchange="toggleBusinessType(${businessCount}); checkBusinessIncome(); generateReport()">
+              <option value="务农">务农</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+        </div>
+        
+        <div id="business${businessCount}_otherSection" class="mb-3 hidden-section">
+          <label class="block text-xs text-gray-600 mb-1">具体经营方式</label>
+          <input type="text" id="business${businessCount}_otherText" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="例：经营茶馆、小卖部等" oninput="generateReport()">
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">生产经营收入（元）</label>
+            <input type="number" id="business${businessCount}_income" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="0.00" oninput="calculateBusinessTotal()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">生产经营支出（元）</label>
+            <input type="number" id="business${businessCount}_expense" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="0.00" oninput="calculateBusinessTotal()">
+          </div>
+        </div>
+        
+        <div class="mt-3 p-2 bg-white rounded text-sm">
+          <p class="text-gray-600">
+            净收入：<span class="font-bold text-orange-600" id="business${businessCount}_net">0.00</span> 元
+          </p>
+        </div>
+      `;
+      
+      container.appendChild(businessDiv);
+      
+      // 显示生产经营合计区域（如果存在）
+      const businessTotalDisplay = document.getElementById('incomeBusinessTotalDisplay');
+      if (businessTotalDisplay) {
+        const totalSection = businessTotalDisplay.closest('div');
+        if (totalSection) {
+          totalSection.classList.remove('hidden-section');
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 14：removeBusinessRecord
+     * 功能：删除生产经营记录
+     * ================================================
+     */
+    function removeBusinessRecord(businessId) {
+      const businessDiv = document.getElementById('business-' + businessId);
+      if (businessDiv) {
+        businessDiv.remove();
+        calculateBusinessTotal();
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 15：toggleBusinessType
+     * 功能：切换生产经营类型的"其他"输入框
+     * ================================================
+     */
+    function toggleBusinessType(recordId) {
+      const typeSelect = document.getElementById('business' + recordId + '_type');
+      const otherSection = document.getElementById('business' + recordId + '_otherSection');
+      const type = typeSelect ? typeSelect.value : '';
+      
+      if (type === '其他') {
+        if (otherSection) {
+          otherSection.classList.remove('hidden-section');
+        }
+      } else {
+        if (otherSection) {
+          otherSection.classList.add('hidden-section');
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 16：calculateBusinessTotal
+     * 功能：计算生产经营收入合计
+     * ================================================
+     */
+    function calculateBusinessTotal() {
+      let totalNet = 0;
+      for (let i = 1; i <= businessCount; i++) {
+        const incomeInput = document.getElementById('business' + i + '_income');
+        const expenseInput = document.getElementById('business' + i + '_expense');
+        const netSpan = document.getElementById('business' + i + '_net');
+        
+        if (incomeInput && expenseInput && netSpan) {
+          const income = parseFloat(incomeInput.value) || 0;
+          const expense = parseFloat(expenseInput.value) || 0;
+          const net = income - expense;
+          
+          netSpan.textContent = net.toFixed(2);
+          totalNet += net;
+        }
+      }
+      document.getElementById('incomeBusinessNet').value = totalNet;
+      document.getElementById('incomeBusinessTotalDisplay').textContent = totalNet.toFixed(2);
+      checkBusinessIncome();
+      generateReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 17：toggleMedicalExpense
+     * 功能：切换医疗支出面板
+     * ================================================
+     */
+    function toggleMedicalExpense() {
+      const container = document.getElementById('medicalExpenseContainer');
+      const btn = document.getElementById('toggleMedicalBtn');
+      
+      if (container.classList.contains('hidden-section')) {
+        container.classList.remove('hidden-section');
+        btn.innerHTML = '<span class="text-xl">🔽</span><span>收起医疗支出</span>';
+        btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+        btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        addMedicalExpense();
+      } else {
+        container.classList.add('hidden-section');
+        btn.innerHTML = '<span class="text-xl">🏥</span><span>添加医疗支出</span>';
+        btn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+        btn.classList.add('bg-red-600', 'hover:bg-red-700');
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 18：addMedicalExpense
+     * 功能：添加医疗支出记录
+     * ================================================
+     */
+    function addMedicalExpense() {
+      // 获取非健康家庭成员选项
+      let memberOptions = '<option value="">请选择患病成员</option>';
+      let hasSickMember = false;
+      
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        const healthInput = document.getElementById('member' + i + '_health');
+        
+        if (nameInput && healthInput) {
+          const name = nameInput.value.trim();
+          const relation = relationInput ? relationInput.value : '成员';
+          const health = healthInput.value;
+          
+          if (name && (health === '大病' || health === '慢性病' || health === '残疾')) {
+            memberOptions += `<option value="${name}">${relation}-${name}（${health}）</option>`;
+            hasSickMember = true;
+          }
+        }
+      }
+      
+      // 如果没有患病成员，提示用户
+      if (!hasSickMember) {
+        alert('💡 提示：请先在家庭成员信息中添加健康状况为"大病"、"慢性病"或"残疾"的成员，然后再添加医疗支出。');
+        return;
+      }
+      
+      const medicalDiv = document.createElement('div');
+      medicalDiv.className = 'bg-red-50 p-4 rounded-lg border-2 border-red-200';
+      medicalDiv.id = 'medical-' + (medicalExpenseCount + 1);
+      medicalExpenseCount++;
+      
+      const recordId = medicalExpenseCount;
+      
+      medicalDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="font-semibold text-gray-700">医疗支出 ${recordId}</h4>
+          <button onclick="removeMedicalExpense(${recordId})" class="text-red-500 text-sm font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">患病成员</label>
+            <select id="medical${recordId}_member" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" onchange="generateReport()">
+              ${memberOptions}
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">就医时间</label>
+            <input type="month" id="medical${recordId}_date" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" onchange="validateMonthInput(this); generateReport()">
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="block text-xs text-gray-600 mb-1">病种</label>
+          <input type="text" id="medical${recordId}_disease" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="例：糖尿病、癌症等" oninput="generateReport()">
+        </div>
+        
+        <div class="mb-3">
+          <label class="block text-xs text-gray-600 mb-1">治疗地点</label>
+          <input type="text" id="medical${recordId}_hospital" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="例：县人民医院" oninput="generateReport()">
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">自付支出（元）</label>
+            <input type="number" id="medical${recordId}_expense" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="0.00" oninput="generateReport()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">预计后续支出（元）</label>
+            <input type="number" id="medical${recordId}_future" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-base md:text-sm" placeholder="0.00" oninput="generateReport()">
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('medicalExpenseContainer').appendChild(medicalDiv);
+    }
+
+    /**
+     * ================================================
+     * 函数 19：removeMedicalExpense
+     * 功能：删除医疗支出记录
+     * ================================================
+     */
+    function removeMedicalExpense(recordId) {
+      const medicalDiv = document.getElementById('medical-' + recordId);
+      if (medicalDiv) {
+        medicalDiv.remove();
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 20：toggleEducationExpense
+     * 功能：切换教育支出面板
+     * ================================================
+     */
+    function toggleEducationExpense() {
+      const container = document.getElementById('educationExpenseContainer');
+      const btn = document.getElementById('toggleEducationBtn');
+      
+      if (container.classList.contains('hidden-section')) {
+        container.classList.remove('hidden-section');
+        btn.innerHTML = '<span class="text-xl">🔽</span><span>收起教育支出</span>';
+        btn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+        btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        addEducationExpense();
+      } else {
+        container.classList.add('hidden-section');
+        btn.innerHTML = '<span class="text-xl">🎓</span><span>添加教育支出</span>';
+        btn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+        btn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 21：addEducationExpense
+     * 功能：添加教育支出记录
+     * ================================================
+     */
+    function addEducationExpense() {
+      const educationDiv = document.createElement('div');
+      educationDiv.className = 'bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200';
+      educationDiv.id = 'education-' + (educationExpenseCount + 1);
+      educationExpenseCount++;
+      
+      const recordId = educationExpenseCount;
+      
+      // 获取非义务教育阶段学生名单
+      let studentOptions = '<option value="">请选择学生</option>';
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const isStudentSelect = document.getElementById('member' + i + '_isStudent');
+        const educationStageSelect = document.getElementById('member' + i + '_educationStage');
+        const schoolNameInput = document.getElementById('member' + i + '_schoolName');
+        
+        // 只选择非义务教育阶段学生
+        if (nameInput && isStudentSelect && educationStageSelect && 
+            isStudentSelect.value === '是' && educationStageSelect.value === '非义务教育') {
+          const name = nameInput.value.trim();
+          const schoolName = schoolNameInput ? schoolNameInput.value.trim() : '';
+          if (name) {
+            studentOptions += `<option value="${name}" ${schoolName ? 'data-school="' + schoolName + '"' : ''}>${name}</option>`;
+          }
+        }
+      }
+      
+      educationDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="font-semibold text-gray-700">教育支出 ${recordId}</h4>
+          <button onclick="removeEducationExpense(${recordId})" class="text-red-500 text-sm font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">学生姓名</label>
+            <select id="education${recordId}_student" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" onchange="generateReport()">
+              ${studentOptions}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">仅显示非义务教育阶段学生</p>
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">教育支出金额（元）</label>
+            <input type="number" id="education${recordId}_expense" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="0.00" oninput="generateReport()">
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="block text-xs text-gray-600 mb-1">就读学校</label>
+          <input type="text" id="education${recordId}_school" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="请输入学校名称（选填）" oninput="generateReport()">
+        </div>
+      `;
+      
+      document.getElementById('educationExpenseContainer').appendChild(educationDiv);
+    }
+
+    /**
+     * ================================================
+     * 函数 22：removeEducationExpense
+     * 功能：删除教育支出记录
+     * ================================================
+     */
+    function removeEducationExpense(recordId) {
+      const educationDiv = document.getElementById('education-' + recordId);
+      if (educationDiv) {
+        educationDiv.remove();
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 23：hideMaritalStatus
+     * 功能：隐藏婚育状况字段
+     * 参数：memberId - 家庭成员 ID
+     * ================================================
+     */
+    function hideMaritalStatus(memberId) {
+      const maritalSection = document.getElementById('member' + memberId + '_maritalSection');
+      if (maritalSection) {
+        maritalSection.classList.add('hidden-section');
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 24：showMaritalStatus
+     * 功能：显示婚育状况字段
+     * 参数：memberId - 家庭成员 ID
+     * ================================================
+     */
+    function showMaritalStatus(memberId) {
+      const maritalSection = document.getElementById('member' + memberId + '_maritalSection');
+      if (maritalSection) {
+        maritalSection.classList.remove('hidden-section');
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 24：toggleCarefulSituation
+     * 功能：切换慎重纳入情形详细说明显示/隐藏
+     * ================================================
+     */
+    function toggleCarefulSituation() {
+      const select = document.getElementById('carefulSituationSelect');
+      const detailSection = document.getElementById('carefulSituationDetailSection');
+      const value = select ? select.value : '无';
+      
+      if (value === '有') {
+        if (detailSection) {
+          detailSection.classList.remove('hidden-section');
+        }
+      } else {
+        if (detailSection) {
+          detailSection.classList.add('hidden-section');
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 24：calculateNetIncomeAndGenerate
+     * 功能：计算净收入并根据金额提示用户核实
+     * ================================================
+     */
+    function calculateNetIncomeAndGenerate() {
+      try {
+        // 检查是否选择了风险类型
+        if (!currentRiskType) {
+          alert('💡 请先选择风险类型（医疗支出类/新增低保类/住房安全类/新增残疾类）！');
+          return;
+        }
+        
+        // 检查是否有家庭成员
+        if (familyMemberCount === 0) {
+          alert('💡 请先添加家庭成员信息！');
+          return;
+        }
+        
+        // 住房安全类不涉及收入核实，直接生成
+        if (currentRiskType === 'housing') {
+          generateReport();
+          showReport();
+          return;
+        }
+        
+        // 其他风险类型需要核实收入
+        // 先计算所有合计
+        calculateWorkTotal();
+        calculateBusinessTotal();
+        calculateTransferTotal();
+        
+        // 计算总收入
+        const totalIncome = (parseFloat(document.getElementById('incomeWorkTotal').value) || 0) +
+                           (parseFloat(document.getElementById('incomeBusinessNet').value) || 0) +
+                           (parseFloat(document.getElementById('incomePropertyTotal').value) || 0) +
+                           (parseFloat(document.getElementById('incomeTransferTotal').value) || 0);
+        
+        // 计算总支出
+        let totalExpense = 0;
+        for (let i = 1; i <= medicalExpenseCount; i++) {
+          const expenseInput = document.getElementById('medical' + i + '_expense');
+          if (expenseInput) {
+            totalExpense += parseFloat(expenseInput.value) || 0;
+          }
+        }
+        for (let i = 1; i <= educationExpenseCount; i++) {
+          const expenseInput = document.getElementById('education' + i + '_expense');
+          if (expenseInput) {
+            totalExpense += parseFloat(expenseInput.value) || 0;
+          }
+        }
+        
+        // 计算家庭人口数（使用统一辅助函数）
+        const familySize = calculateFamilySize();
+        
+        // 计算人均纯收入（总收入 - 医疗支出）÷ 家庭人口
+        let perCapitaIncome = 0;
+        if (familySize > 0) {
+          perCapitaIncome = (totalIncome - totalExpense) / familySize;
+        }
+        
+        // 判断并提示（使用人均纯收入，已完成核实的不重复提示）
+        if (!verificationCompleted && perCapitaIncome > 8500 && perCapitaIncome < 9500) {
+          // 8500-9500 元，提示选择
+          showVerificationDialog(perCapitaIncome, false);
+        } else if (!verificationCompleted && perCapitaIncome <= 8500) {
+          // 低于 8500 元，强制核实
+          showVerificationDialog(perCapitaIncome, true);
+        } else {
+          // 高于 9500 元或已完成核实，直接生成
+          generateReport();
+          showReport();
+        }
+      } catch (error) {
+        console.error('生成文本时出错：', error);
+        alert('❌ 生成文本时出错，请检查控制台详细信息。\n\n错误信息：' + error.message);
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 25：showVerificationDialog
+     * 功能：显示核实对话框
+     * 参数：perCapitaIncome - 人均纯收入，forced - 是否强制核实
+     * ================================================
+     */
+    function showVerificationDialog(perCapitaIncome, forced) {
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'verificationOverlay';
+      
+      const title = forced ? '⚠️ 需要核实' : '💡 温馨提示';
+      const message = forced 
+        ? `该家庭人均纯收入为<strong class="text-red-600">${perCapitaIncome.toFixed(2)}元</strong>，低于 8500 元。<br><br><strong>请选择核实方式：</strong>`
+        : `该家庭人均纯收入为<strong class="text-orange-600">${perCapitaIncome.toFixed(2)}元</strong>，在 8500-9500 元之间。<br><br><strong>请选择：</strong>`;
+      
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+          <div class="text-center mb-4">
+            <div class="text-6xl mb-2">${forced ? '⚠️' : '💡'}</div>
+            <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+          </div>
+          
+          <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
+            <p class="text-gray-700 text-sm leading-relaxed">
+              ${message}
+            </p>
+          </div>
+          
+          <div class="space-y-3">
+            ${!forced ? `
+            <button 
+              onclick="directConfirm()" 
+              class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors"
+            >
+              ✓ 确认无误，直接生成
+            </button>
+            ` : ''}
+            
+            <button 
+              onclick="showVerificationOptions()" 
+              class="w-full ${forced ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'} text-white px-4 py-3 rounded-xl font-semibold transition-colors"
+            >
+              🔍 再核实
+            </button>
+            
+            ${!forced ? `
+            <button 
+              onclick="closeVerificationDialog()" 
+              class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-3 rounded-xl font-semibold transition-colors"
+            >
+              取消
+            </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+    }
+
+    /**
+     * ================================================
+     * 函数 26：directConfirm
+     * 功能：直接确认生成（8500-9500 元时用户选择直接生成）
+     * ================================================
+     */
+    function directConfirm() {
+      closeVerificationDialog();
+      // 用户选择直接生成，也标记为已完成核实
+      verificationCompleted = true;
+      generateReport();
+      showReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 27：closeVerificationDialog
+     * 功能：关闭核实对话框
+     * ================================================
+     */
+    function closeVerificationDialog() {
+      const overlay = document.getElementById('verificationOverlay');
+      if (overlay) {
+        overlay.remove();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 28：showVerificationOptions
+     * 功能：显示核实选项（存款支付或亲朋代付）
+     * ================================================
+     */
+    function showVerificationOptions() {
+      closeVerificationDialog();
+      needVerification = true;
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'verificationOptionsOverlay';
+      
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+          <div class="text-center mb-4">
+            <div class="text-6xl mb-2">🔍</div>
+            <h3 class="text-xl font-bold text-gray-800">选择核实方式</h3>
+          </div>
+          
+          <div class="space-y-3">
+            <button 
+              onclick="selectVerificationType('deposit')" 
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors text-left flex items-center gap-3"
+            >
+              <span class="text-2xl">💰</span>
+              <span>存款支付</span>
+            </button>
+            
+            <button 
+              onclick="selectVerificationType('proxy')" 
+              class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors text-left flex items-center gap-3"
+            >
+              <span class="text-2xl">🤝</span>
+              <span>亲朋代付</span>
+            </button>
+            
+            <button 
+              onclick="closeVerificationOptions()" 
+              class="w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-3 rounded-xl font-semibold transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+    }
+
+    /**
+     * ================================================
+     * 函数 29：closeVerificationOptions
+     * 功能：关闭核实选项对话框
+     * ================================================
+     */
+    function closeVerificationOptions() {
+      const overlay = document.getElementById('verificationOptionsOverlay');
+      if (overlay) {
+        overlay.remove();
+      }
+      needVerification = false;
+    }
+
+    /**
+     * ================================================
+     * 函数 30：selectVerificationType
+     * 功能：选择核实类型
+     * 参数：type - 'deposit' 或 'proxy'
+     * ================================================
+     */
+    function selectVerificationType(type) {
+      closeVerificationOptions();
+      verificationType = type;
+      needVerification = true;  // 设置核实标志，确保 generateReport 能处理代付人信息
+      
+      if (type === 'deposit') {
+        showDepositSection();
+      } else {
+        showProxySection();
+      }
+      
+      // 设置核实完成标记
+      verificationCompleted = true;
+      
+      // 添加视觉提示
+      showVerificationCompletedToast();
+      
+      generateReport();
+      showReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 31：showDepositSection
+     * 功能：显示存款支付区域
+     * ================================================
+     */
+    
+    /**
+     * ================================================
+     * 函数 31.5：showVerificationCompletedToast
+     * 功能：显示核实完成提示（视觉反馈）
+     * ================================================
+     */
+    function showVerificationCompletedToast() {
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
+      toast.id = 'verificationCompletedToast';
+      toast.innerHTML = `
+        <span class="text-2xl">✅</span>
+        <span class="font-semibold">核实信息已录入，再次生成将直接输出文本</span>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      // 3 秒后自动消失
+      setTimeout(function() {
+        toast.style.transition = 'opacity 0.5s';
+        toast.style.opacity = '0';
+        setTimeout(function() {
+          toast.remove();
+        }, 500);
+      }, 3000);
+    }
+    
+    function showDepositSection() {
+      // 计算总自付支出
+      let totalSelfPay = 0;
+      for (let i = 1; i <= medicalExpenseCount; i++) {
+        const expenseInput = document.getElementById('medical' + i + '_expense');
+        if (expenseInput) {
+          totalSelfPay += parseFloat(expenseInput.value) || 0;
+        }
+      }
+      
+      const depositSection = document.createElement('div');
+      depositSection.id = 'depositVerificationSection';
+      depositSection.className = 'bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-4';
+      
+      depositSection.innerHTML = `
+        <h3 class="text-lg font-bold text-blue-800 mb-3">💰 存款支付核实</h3>
+        
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            存款来源
+          </label>
+          <input 
+            type="text" 
+            id="depositSource" 
+            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+            placeholder="例：多年积蓄、变卖财产等"
+            oninput="generateReport()"
+          >
+        </div>
+        
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            支付金额（元）
+          </label>
+          <div class="flex gap-2">
+            <input 
+              type="number" 
+              id="depositAmount" 
+              step="0.01"
+              min="0"
+              class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+              placeholder="0.00"
+              oninput="generateReport()"
+            >
+            <button 
+              onclick="fillFullAmount('deposit')" 
+              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
+            >
+              快捷输入全部金额
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">
+            总自付支出：${totalSelfPay.toFixed(2)}元
+          </p>
+        </div>
+      `;
+      
+      // 插入到支出信息区域前面
+      const expenseSection = document.getElementById('expenseSection');
+      expenseSection.parentNode.insertBefore(depositSection, expenseSection);
+    }
+
+    /**
+     * ================================================
+     * 函数 32：showProxySection
+     * 功能：显示亲朋代付区域并滚动到该位置
+     * ================================================
+     */
+    function showProxySection() {
+      const proxySection = document.createElement('div');
+      proxySection.id = 'proxyVerificationSection';
+      proxySection.className = 'bg-purple-50 border-2 border-purple-300 rounded-xl p-4 mb-4';
+      
+      proxySection.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-lg font-bold text-purple-800">🤝 亲朋代付核实</h3>
+          <button 
+            onclick="addProxyRecord()" 
+            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+          >
+            ➕ 添加代付人
+          </button>
+        </div>
+        
+        <div id="proxyContainer" class="space-y-3">
+        </div>
+      `;
+      
+      // 插入到支出信息区域前面
+      const expenseSection = document.getElementById('expenseSection');
+      expenseSection.parentNode.insertBefore(proxySection, expenseSection);
+      
+      // 自动添加一个代付人记录
+      addProxyRecord();
+      
+      // 延迟滚动，确保 DOM 已更新
+      setTimeout(function() {
+        if (proxySection) {
+          proxySection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // 添加高亮效果（2 秒后消失）
+          proxySection.style.transition = 'box-shadow 0.3s, transform 0.3s';
+          proxySection.style.boxShadow = '0 0 20px rgba(147, 51, 234, 0.5)';
+          proxySection.style.transform = 'scale(1.02)';
+          
+          setTimeout(function() {
+            proxySection.style.boxShadow = '';
+            proxySection.style.transform = '';
+          }, 2000);
+        }
+      }, 300);
+    }
+
+    /**
+     * ================================================
+     * 函数 33：addProxyRecord
+     * 功能：添加代付人记录
+     * ================================================
+     */
+    function addProxyRecord() {
+      proxyCount++;
+      const container = document.getElementById('proxyContainer');
+      
+      // 计算总自付支出
+      let totalSelfPay = 0;
+      for (let i = 1; i <= medicalExpenseCount; i++) {
+        const expenseInput = document.getElementById('medical' + i + '_expense');
+        if (expenseInput) {
+          totalSelfPay += parseFloat(expenseInput.value) || 0;
+        }
+      }
+      
+      const proxyDiv = document.createElement('div');
+      proxyDiv.className = 'bg-white p-4 rounded-lg border-2 border-purple-200';
+      proxyDiv.id = 'proxy-' + proxyCount;
+      
+      proxyDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="font-semibold text-gray-700">代付人 ${proxyCount}</h4>
+          <button onclick="removeProxyRecord(${proxyCount})" class="text-red-500 text-sm font-semibold hover:text-red-700">
+            🗑️ 删除
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">姓名</label>
+            <input type="text" id="proxy${proxyCount}_name" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="姓名" oninput="generateReport()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">与病人关系</label>
+            <input type="text" id="proxy${proxyCount}_relation" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="例：舅舅、表兄等" oninput="generateReport()">
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="block text-xs text-gray-600 mb-1">务工地点</label>
+          <input type="text" id="proxy${proxyCount}_location" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="例：广东省广州市" oninput="generateReport()">
+          <p class="text-xs text-gray-500 mt-1">
+            注：代付人为非共同居住人
+          </p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">务工收入（元）</label>
+            <input type="number" id="proxy${proxyCount}_income" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="0.00" oninput="generateReport()">
+          </div>
+          
+          <div>
+            <label class="block text-xs text-gray-600 mb-1">代付金额（元）</label>
+            <div class="flex gap-1">
+              <input type="number" id="proxy${proxyCount}_amount" step="0.01" min="0" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm" placeholder="0.00" oninput="generateReport()">
+              <button 
+                onclick="fillFullAmount('proxy', ${proxyCount})" 
+                class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-2 rounded-lg text-xs font-semibold transition-colors"
+              >
+                快捷
+              </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              总自付支出：${totalSelfPay.toFixed(2)}元
+            </p>
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(proxyDiv);
+    }
+
+    /**
+     * ================================================
+     * 函数 34：removeProxyRecord
+     * 功能：删除代付人记录
+     * ================================================
+     */
+    function removeProxyRecord(proxyId) {
+      const proxyDiv = document.getElementById('proxy-' + proxyId);
+      if (proxyDiv) {
+        proxyDiv.remove();
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 35：fillFullAmount
+     * 功能：快捷输入全部金额
+     * 参数：type - 'deposit' 或 'proxy'，proxyId - 代付人 ID（可选）
+     * ================================================
+     */
+    function fillFullAmount(type, proxyId) {
+      // 计算总自付支出
+      let totalSelfPay = 0;
+      for (let i = 1; i <= medicalExpenseCount; i++) {
+        const expenseInput = document.getElementById('medical' + i + '_expense');
+        if (expenseInput) {
+          totalSelfPay += parseFloat(expenseInput.value) || 0;
+        }
+      }
+      
+      if (type === 'deposit') {
+        document.getElementById('depositAmount').value = totalSelfPay.toFixed(2);
+      } else if (type === 'proxy' && proxyId) {
+        document.getElementById('proxy' + proxyId + '_amount').value = totalSelfPay.toFixed(2);
+      }
+      
+      generateReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 13：checkBusinessIncome
+     * 功能：检查生产经营性收入是否过高，提醒用户确认
+     * ================================================
+     */
+    function checkBusinessIncome() {
+      const businessIncome = parseFloat(document.getElementById('incomeBusinessNet').value) || 0;
+      
+      // 如果没有生产经营收入，不检查
+      if (businessIncome <= 0) {
+        return;
+      }
+      
+      // 检查是否有务农记录
+      let hasFarmingRecord = false;
+      for (let i = 1; i <= businessCount; i++) {
+        const typeInput = document.getElementById('business' + i + '_type');
+        if (typeInput && typeInput.value === '务农') {
+          hasFarmingRecord = true;
+          break;
+        }
+      }
+      
+      // 如果是务农，检查人均净收入是否超过 8000 元
+      if (hasFarmingRecord) {
+        // 计算家庭非务工劳动力人数
+        let nonWorkLaborCount = 0;
+        for (let i = 1; i <= familyMemberCount; i++) {
+          const laborInput = document.getElementById('member' + i + '_labor');
+          const isStudentSelect = document.getElementById('member' + i + '_isStudent');
+          if (laborInput) {
+            const labor = laborInput.value;
+            const isStudent = isStudentSelect ? isStudentSelect.value : '否';
+            // 非务工劳动力：有劳动力能力但不是学生的
+            if (labor && labor.includes('劳动力') && !labor.includes('无') && isStudent === '否') {
+              nonWorkLaborCount++;
+            }
+          }
+        }
+        
+        // 如果家庭有非务工劳动力，计算人均收入
+        if (nonWorkLaborCount > 0) {
+          const perCapitaIncome = businessIncome / nonWorkLaborCount;
+          if (perCapitaIncome > 8000) {
+            // 显示自定义弹窗
+            showIncomeWarning(businessIncome, perCapitaIncome, nonWorkLaborCount);
+          }
+        }
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 10：showIncomeWarning
+     * 功能：显示收入过高警告弹窗（居中显示）
+     * ================================================
+     */
+    function showIncomeWarning(businessIncome, perCapitaIncome, laborCount) {
+      // 创建遮罩层
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'incomeWarningOverlay';
+      
+      // 创建弹窗内容
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl transform transition-all">
+          <!-- 警告图标 -->
+          <div class="text-center mb-4">
+            <div class="text-6xl mb-2">⚠️</div>
+            <h3 class="text-xl font-bold text-gray-800">温馨提示</h3>
+          </div>
+          
+          <!-- 提示信息 -->
+          <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
+            <p class="text-gray-700 text-sm leading-relaxed">
+              该家庭务农生产经营性净收入为 <strong class="text-red-600">${businessIncome.toFixed(2)}元</strong>，
+              非务工劳动力共 <strong class="text-blue-600">${laborCount}人</strong>，
+              人均净收入约为 <strong class="text-red-600">${perCapitaIncome.toFixed(2)}元</strong>。
+            </p>
+            <p class="text-gray-600 text-xs mt-2">
+              💡 提示：一般情况下，务农人均净收入较少超过 8000 元。请您再次确认数据是否准确，如确属实际情况，请点击"确认无误"继续。
+            </p>
+          </div>
+          
+          <!-- 按钮组 -->
+          <div class="flex gap-3">
+            <button 
+              onclick="closeIncomeWarning(true)" 
+              class="flex-1 bg-green-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-green-700 transition-colors"
+            >
+              ✓ 确认无误
+            </button>
+            <button 
+              onclick="closeIncomeWarning(false)" 
+              class="flex-1 bg-gray-300 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-400 transition-colors"
+            >
+              ✎ 修改数据
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(overlay);
+    }
+
+    /**
+     * ================================================
+     * 函数 11：closeIncomeWarning
+     * 功能：关闭收入警告弹窗
+     * 参数：confirmed - 是否确认无误（true=确认，false=修改）
+     * ================================================
+     */
+    function closeIncomeWarning(confirmed) {
+      // 移除弹窗
+      const overlay = document.getElementById('incomeWarningOverlay');
+      if (overlay) {
+        overlay.remove();
+      }
+      
+      // 如果用户选择修改，清空收入输入框
+      if (!confirmed) {
+        document.getElementById('incomeBusinessNet').value = '';
+        document.getElementById('incomeBusinessNet').focus();
+      }
+      
+      // 重新生成文本
+      generateReport();
+    }
+
+    /**
+     * ================================================
+     * 函数 9：determineLaborType
+     * 功能：根据年龄、健康状况和学生身份判断劳动力类型
+     * 参数：age - 年龄，health - 健康状况，isStudent - 是否在校学生
+     * 返回：{ laborType: string, needsManualSelect: boolean, manualOptions: array, message: string }
+     * 
+     * 规则说明：
+     * - <14 岁：无劳动力
+     * - 14-25 岁在校学生：无劳动力
+     * - 16-59 岁健康非在校：普通劳动力（自动）
+     * - 16-59 岁非健康非在校：弱劳动力或丧失劳动力（需用户选择）
+     * - 60-79 岁健康：弱劳动力
+     * - 60-79 岁慢性病：弱劳动力或无劳动力
+     * - 60-79 岁大病/残疾：无劳动力
+     * - ≥80 岁：无劳动力
+     * ================================================
+     */
+    function determineLaborType(age, health, isStudent) {
+      // 年龄未填写
+      if (!age || age === 0) {
+        return {
+          laborType: '',
+          needsManualSelect: false,
+          manualOptions: [],
+          message: '请输入年龄后，系统将自动判断劳动力情况'
+        };
+      }
+      
+      // 14 岁以下：自动认定无劳动力
+      if (age < 14) {
+        return {
+          laborType: '无劳动力',
+          needsManualSelect: false,
+          manualOptions: [],
+          message: ''
+        };
+      }
+      
+      // 14-25 岁在校学生：无劳动力
+      if (age <= 25 && isStudent === '是') {
+        return {
+          laborType: '无劳动力',
+          needsManualSelect: false,
+          manualOptions: [],
+          message: ''
+        };
+      }
+      
+      // 80 岁以上：自动认定无劳动力
+      if (age >= 80) {
+        return {
+          laborType: '无劳动力',
+          needsManualSelect: false,
+          manualOptions: [],
+          message: ''
+        };
+      }
+      
+      // 60-79 岁老年人群
+      if (age >= 60) {
+        if (health === '健康') {
+          return {
+            laborType: '弱劳动力',
+            needsManualSelect: false,
+            manualOptions: [],
+            message: ''
+          };
+        } else if (health === '慢性病') {
+          // 60-79 岁慢性病
+          return {
+            laborType: '弱劳动力或无劳动力（请用户在最终生成文本中自行选择）',
+            needsManualSelect: false,
+            manualOptions: [],
+            message: ''
+          };
+        } else {
+          // 大病/残疾：无劳动力
+          return {
+            laborType: '无劳动力',
+            needsManualSelect: false,
+            manualOptions: [],
+            message: ''
+          };
+        }
+      }
+      
+      // 16-59 岁成年人群
+      if (age >= 16) {
+        if (health === '健康') {
+          return {
+            laborType: '普通劳动力',
+            needsManualSelect: false,
+            manualOptions: [],
+            message: ''
+          };
+        } else {
+          // 慢性病/大病/残疾：需要用户在 UI 上选择弱劳动力或丧失劳动力
+          return {
+            laborType: '',
+            needsManualSelect: true,
+            manualOptions: ['弱劳动力', '丧失劳动力'],
+            message: '请选择劳动力类型'
+          };
+        }
+      }
+
+      // 14-15 岁非在校学生：无劳动力（特殊处理）
+      return {
+        laborType: '无劳动力',
+        needsManualSelect: false,
+        manualOptions: [],
+        message: ''
+      };
+    }
+
+    /**
+     * ================================================
+     * 函数 10：calculateLaborAbility
+     * 功能：根据年龄、健康状况和学生身份自动判断劳动力情况（主函数）
+     * 同时自动统计学生信息
+     * ================================================
+     */
+    function calculateLaborAbility() {
+      // 重置学生计数
+      let studentCount = 0; // 在校学生总数
+      let nonCompulsoryCount = 0; // 非义务教育阶段学生
+      
+      // 遍历所有家庭成员
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const ageInput = document.getElementById('member' + i + '_age');
+        const healthSelect = document.getElementById('member' + i + '_health');
+        const laborInput = document.getElementById('member' + i + '_labor');
+        const isStudentSelect = document.getElementById('member' + i + '_isStudent');
+        const studentSection = document.getElementById('member' + i + '_studentSection');
+        const educationStageSection = document.getElementById('member' + i + '_educationStageSection');
+        const schoolNameSection = document.getElementById('member' + i + '_schoolNameSection');
+        
+        if (!ageInput || !healthSelect || !laborInput) continue;
+        
+        const age = parseInt(ageInput.value) || 0;
+        const health = healthSelect ? healthSelect.value : '健康';
+        const isStudent = isStudentSelect ? isStudentSelect.value : '否';
+        
+        // === 第 1 步：处理学生相关字段显示 ===
+        
+        // 14 岁以下：隐藏所有学生字段，默认义务教育阶段
+        if (age > 0 && age < 14) {
+          if (studentSection) studentSection.classList.add('hidden-section');
+          if (educationStageSection) educationStageSection.classList.add('hidden-section');
+          if (schoolNameSection) schoolNameSection.classList.add('hidden-section');
+          studentCount++; // 默认义务教育阶段
+        }
+        // 14-25 岁：显示学生选择
+        else if (age > 0 && age <= 25) {
+          if (studentSection && isStudentSelect) {
+            studentSection.classList.remove('hidden-section');
+          }
+          
+          // 选择"是"显示教育阶段
+          if (educationStageSection && isStudent === '是') {
+            educationStageSection.classList.remove('hidden-section');
+            studentCount++;
+            
+            const educationStage = document.getElementById('member' + i + '_educationStage');
+            if (educationStage) {
+              const stage = educationStage.value;
+              // 非义务教育显示学校名称
+              if (schoolNameSection && stage === '非义务教育') {
+                schoolNameSection.classList.remove('hidden-section');
+                nonCompulsoryCount++;
+              } else if (schoolNameSection) {
+                schoolNameSection.classList.add('hidden-section');
+              }
+            }
+          } else if (educationStageSection) {
+            educationStageSection.classList.add('hidden-section');
+            if (schoolNameSection) {
+              schoolNameSection.classList.add('hidden-section');
+            }
+          }
+        }
+        // 25 岁以上：隐藏所有学生字段
+        else {
+          if (studentSection) studentSection.classList.add('hidden-section');
+          if (educationStageSection) educationStageSection.classList.add('hidden-section');
+          if (schoolNameSection) schoolNameSection.classList.add('hidden-section');
+        }
+        
+        // === 第 2 步：判断劳动力类型 ===
+        
+        const result = determineLaborType(age, health, isStudent);
+        
+        // === 第 3 步：设置劳动力情况 ===
+
+        const laborSelect = document.getElementById('member' + i + '_laborSelect');
+        const currentSelectedValue = laborSelect ? laborSelect.value : '';
+
+        if (result.needsManualSelect) {
+          // 需要用户手动选择：显示下拉框，隐藏 textarea
+          laborInput.classList.add('hidden-section');
+          if (laborSelect) {
+            laborSelect.classList.remove('hidden-section');
+            // 如果用户还没有选择，则重置；已选择则保持
+            if (!currentSelectedValue) {
+              laborSelect.value = '';
+            } else {
+              // 用户已选择，将值同步到 laborInput
+              laborInput.value = currentSelectedValue;
+            }
+          }
+        } else {
+          // 自动判定：显示 textarea，隐藏下拉框
+          laborInput.classList.remove('hidden-section');
+          if (laborSelect) {
+            laborSelect.classList.add('hidden-section');
+          }
+          if (result.laborType) {
+            laborInput.value = result.laborType;
+          } else if (result.message) {
+            laborInput.value = result.message;
+          }
+        }
+      }
+      
+      // === 第 5 步：处理教育支出显示 ===
+      
+      const expenseEducationSection = document.getElementById('expenseEducationSection');
+      if (nonCompulsoryCount > 0 && expenseEducationSection) {
+        expenseEducationSection.classList.remove('hidden-section');
+      } else if (expenseEducationSection) {
+        expenseEducationSection.classList.add('hidden-section');
+      }
+    }
+
+    /**
+     * ================================================
+     * 辅助函数：selectLaborType
+     * 功能：用户选择劳动力类型后，将选择写入 laborInput 并触发文本生成
+     * 参数：memberId - 成员 ID，value - 选择的劳动力类型
+     * ================================================
+     */
+    function selectLaborType(memberId, value) {
+      const laborInput = document.getElementById('member' + memberId + '_labor');
+      if (laborInput && value) {
+        laborInput.value = value;
+        generateReport();
+      }
+    }
+
+    /**
+     * ================================================
+     * 辅助函数：calculateFamilySize
+     * 功能：计算家庭人口数（统一入口，避免重复计算）
+     * 返回：家庭人口数
+     * ================================================
+     */
+    function calculateFamilySize() {
+      let familySize = 0;
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const ageInput = document.getElementById('member' + i + '_age');
+        if (ageInput && parseInt(ageInput.value) > 0) {
+          familySize++;
+        }
+      }
+      return familySize;
+    }
+
+    /**
+     * ================================================
+     * 辅助函数：calculateStudentInfo
+     * 功能：统计学生信息（统一入口，避免重复计算）
+     * 返回：{ studentCount, compulsoryCount, nonCompulsoryCount, nonCompulsorySchools }
+     * ================================================
+     */
+    function calculateStudentInfo() {
+      let studentCount = 0; // 在校学生总数
+      let compulsoryCount = 0; // 义务教育阶段
+      let nonCompulsoryCount = 0; // 非义务教育阶段
+      let nonCompulsorySchools = []; // 非义务教育学校名称
+      
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const isStudentSelect = document.getElementById('member' + i + '_isStudent');
+        const educationStage = document.getElementById('member' + i + '_educationStage');
+        const schoolName = document.getElementById('member' + i + '_schoolName');
+        
+        if (isStudentSelect && isStudentSelect.value === '是') {
+          studentCount++;
+          if (educationStage) {
+            if (educationStage.value === '义务教育') {
+              compulsoryCount++;
+            } else if (educationStage.value === '非义务教育') {
+              nonCompulsoryCount++;
+              if (schoolName && schoolName.value.trim()) {
+                nonCompulsorySchools.push(schoolName.value.trim());
+              }
+            }
+          }
+        }
+      }
+      
+      return {
+        studentCount: studentCount,
+        compulsoryCount: compulsoryCount,
+        nonCompulsoryCount: nonCompulsoryCount,
+        nonCompulsorySchools: nonCompulsorySchools
+      };
+    }
+
+    /**
+     * ================================================
+     * 函数 10：calculateTotals
+     * 功能：计算总收入和人均纯收入
+     * ================================================
+     */
+    function calculateTotals() {
+      // 获取各项收入
+      const incomeWork = parseFloat(document.getElementById('incomeWorkTotal').value) || 0;
+      const incomeBusiness = parseFloat(document.getElementById('incomeBusinessNet').value) || 0;
+      const incomeProperty = parseFloat(document.getElementById('incomePropertyTotal').value) || 0;
+      const incomeTransfer = parseFloat(document.getElementById('incomeTransferTotal').value) || 0;
+      
+      // 计算总收入
+      const totalIncome = incomeWork + incomeBusiness + incomeProperty + incomeTransfer;
+      
+      // 计算家庭人口数（使用统一辅助函数）
+      const familySize = calculateFamilySize();
+      
+      // 计算人均纯收入
+      let perCapitaIncome = 0;
+      if (familySize > 0) {
+        perCapitaIncome = totalIncome / familySize;
+      }
+      
+      // 更新显示
+      document.getElementById('totalIncomeDisplay').textContent = formatAmount(totalIncome);
+      document.getElementById('perCapitaIncomeDisplay').textContent = formatAmount(perCapitaIncome);
+    }
+
+    /**
+     * ================================================
+     * 函数 30：getCurrentYearMonth
+     * 功能：获取当前年月（格式：YYYY-MM）
+     * ================================================
+     */
+    function getCurrentYearMonth() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}`;
+    }
+
+    /**
+     * ================================================
+     * 函数 31：getOneYearAgo
+     * 功能：获取一年前的年月（格式：YYYY-MM，往前推 12 个月）
+     * ================================================
+     */
+    function getOneYearAgo() {
+      const now = new Date();
+      // 往前推 12 个月
+      const year = now.getFullYear() - 1;
+      const month = String(now.getMonth() + 2).padStart(2, '0'); // +2 是因为 getMonth() 从 0 开始，再加 1 是下个月
+      
+      // 如果月份超过 12，调整为下一年
+      if (now.getMonth() + 2 > 12) {
+        return `${year + 1}-01`;
+      }
+      
+      return `${year}-${month}`;
+    }
+
+    /**
+     * ================================================
+     * 函数 32：validateMonthInput
+     * 功能：验证月份输入框，确保在允许范围内
+     * 参数：inputElement - 输入框元素
+     * ================================================
+     */
+    function validateMonthInput(inputElement) {
+      const minDate = getOneYearAgo();
+      const maxDate = getCurrentYearMonth();
+      let value = inputElement.value;
+      
+      // 如果输入为空，不验证
+      if (!value) {
+        return;
+      }
+      
+      // 如果小于最小值，设置为最小值
+      if (value < minDate) {
+        inputElement.value = minDate;
+        alert(`⚠️ 时间不能早于${minDate}，已自动调整为${minDate}`);
+      }
+      
+      // 如果大于最大值，设置为最大值
+      if (value > maxDate) {
+        inputElement.value = maxDate;
+        alert(`⚠️ 时间不能晚于${maxDate}，已自动调整为${maxDate}`);
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 33：formatAmount
+     * 功能：格式化金额，小数点后为 0 时不保留小数
+     * 参数：amount - 金额数字
+     * ================================================
+     */
+    function formatAmount(amount) {
+      const num = parseFloat(amount);
+      if (isNaN(num)) return '0';
+      // 如果是整数，不保留小数
+      if (Number.isInteger(num)) {
+        return num.toString();
+      }
+      // 如果有小数，保留 2 位
+      return num.toFixed(2);
+    }
+
+    /**
+     * ================================================
+     * 函数 11：generateReport
+     * 功能：根据用户填写的信息生成文本
+     * ================================================
+     */
+    function generateReport() {
+      // 先计算
+      calculateTotals();
+      calculateLaborAbility();
+      
+      // 获取家庭成员信息
+      let familyMembersText = '';
+      let familySize = 0;
+      let laborCount = 0;
+      let householderName = '';
+      
+      // 遍历家庭成员，查找户主并构建家庭成员文本
+      for (let i = 1; i <= familyMemberCount; i++) {
+        const nameInput = document.getElementById('member' + i + '_name');
+        const relationInput = document.getElementById('member' + i + '_relation');
+        const ageInput = document.getElementById('member' + i + '_age');
+        const laborInput = document.getElementById('member' + i + '_labor');
+        
+        if (!nameInput || !relationInput || !ageInput || !laborInput) continue;
+        
+        const name = nameInput.value.trim();
+        let relation = relationInput.value;
+        const age = parseInt(ageInput.value) || 0;
+        const labor = laborInput.value;
+        // 获取健康状况
+        const healthInput = document.getElementById('member' + i + '_health');
+        const health = healthInput ? healthInput.value : '健康';
+        // 获取婚育状况
+        const maritalInput = document.getElementById('member' + i + '_marital');
+        const marital = (maritalInput && maritalInput.value) ? maritalInput.value : '';
+        
+        if (name && age > 0) {
+          familySize++;
+          
+          if (relation === '户主') {
+            householderName = name;
+            // 户主信息放在最前面
+            if (labor && labor.includes('劳动力') && !labor.includes('无')) {
+              laborCount++;
+            }
+            familyMembersText = `户主${name}${age}岁，${health}，${marital ? marital + '，' : ''}${labor}`;
+          } else {
+            // 其他家庭成员
+            if (labor && labor.includes('劳动力') && !labor.includes('无')) {
+              laborCount++;
+            }
+            if (familyMembersText) {
+              familyMembersText += `，${relation}${name}${age}岁，${health}，${marital ? marital + '，' : ''}${labor}`;
+            } else {
+              familyMembersText = `${relation}${name}${age}岁，${health}，${marital ? marital + '，' : ''}${labor}`;
+            }
+          }
+        }
+      }
+      
+      // 如果户主姓名未填写，不生成文本
+      if (!householderName) {
+        const reportText = document.getElementById('reportText');
+        if (reportText) {
+          reportText.value = '请先添加户主信息（在"与户主关系"中选择"户主"）后再生成文本...';
+        }
+        return;
+      }
+      
+      // 使用辅助函数统计学生信息（避免重复计算）
+      const studentInfo = calculateStudentInfo();
+      const compulsoryCount = studentInfo.compulsoryCount;
+      const nonCompulsoryCount = studentInfo.nonCompulsoryCount;
+      const nonCompulsorySchools = studentInfo.nonCompulsorySchools;
+      
+      // 构建学生文本
+      let studentsText = '';
+      if (compulsoryCount > 0) {
+        studentsText += `义务教育阶段${compulsoryCount}人`;
+      }
+      if (nonCompulsoryCount > 0) {
+        if (studentsText) studentsText += '，';
+        studentsText += `非义务教育阶段${nonCompulsoryCount}人`;
+      }
+      
+      // 自动生成务工收入明细
+      let workIncomeDetail = '';
+      for (let i = 1; i <= workIncomeCount; i++) {
+        const nameInput = document.getElementById('work' + i + '_name');
+        const provinceInput = document.getElementById('work' + i + '_province');
+        const cityInput = document.getElementById('work' + i + '_city');
+        const districtSection = document.getElementById('work' + i + '_districtSection');
+        const startTimeInput = document.getElementById('work' + i + '_startTime');
+        const endTimeInput = document.getElementById('work' + i + '_endTime');
+        const industryInput = document.getElementById('work' + i + '_industry');
+        const amountInput = document.getElementById('work' + i + '_amount');
+        
+        if (nameInput && provinceInput && amountInput) {
+          const name = nameInput.value.trim();
+          const province = provinceInput.value;
+          const city = cityInput ? cityInput.value : '';
+          // 只有四川省内才获取县区字段
+          const district = (province === '四川省' && districtSection) ? document.getElementById('work' + i + '_district').value : '';
+          const startTime = startTimeInput ? startTimeInput.value : '';
+          const endTime = endTimeInput ? endTimeInput.value : '';
+          const industry = industryInput ? industryInput.value.trim() : '';
+          const amount = parseFloat(amountInput.value) || 0;
+          
+          if (name && province && amount > 0) {
+            if (workIncomeDetail) workIncomeDetail += '；';
+            
+            // 构建时间文本
+            let timeText = '';
+            if (startTime && endTime) {
+              timeText = `${startTime.replace('-', '年')}月 至 ${endTime.replace('-', '年')}月`;
+            }
+            
+            // 构建地点文本
+            let locationText = province;
+            if (city) locationText += city;
+            if (district) locationText += district;
+            
+            // 构建完整文本
+            workIncomeDetail += `${name}${timeText ? ' ' + timeText : ''}在${locationText}${industry ? '从事' + industry : ''}，扣除必要务工成本后收入${formatAmount(amount)}元`;
+          }
+        }
+      }
+      if (!workIncomeDetail) workIncomeDetail = '未填写';
+      
+      // 获取收入信息
+      const incomeWorkTotal = parseFloat(document.getElementById('incomeWorkTotal').value) || 0;
+      const incomeBusinessNet = parseFloat(document.getElementById('incomeBusinessNet').value) || 0;
+      const incomePropertyTotal = parseFloat(document.getElementById('incomePropertyTotal').value) || 0;
+      const incomeTransferTotal = parseFloat(document.getElementById('incomeTransferTotal').value) || 0;
+      const totalIncome = incomeWorkTotal + incomeBusinessNet + incomePropertyTotal + incomeTransferTotal;
+      
+      const perCapitaIncome = familySize > 0 ? (totalIncome / familySize) : 0;
+      
+      // 获取支出信息 - 医疗支出
+      let expenseMedicalDetail = '';
+      let expenseFutureTotal = 0;
+      for (let i = 1; i <= medicalExpenseCount; i++) {
+        const memberInput = document.getElementById('medical' + i + '_member');
+        const dateInput = document.getElementById('medical' + i + '_date');
+        const diseaseInput = document.getElementById('medical' + i + '_disease');
+        const hospitalInput = document.getElementById('medical' + i + '_hospital');
+        const expenseInput = document.getElementById('medical' + i + '_expense');
+        const futureInput = document.getElementById('medical' + i + '_future');
+        
+        if (memberInput && diseaseInput && expenseInput) {
+          const member = memberInput.value;
+          const date = dateInput ? dateInput.value.replace('-', '年') + '月' : '';
+          const disease = diseaseInput.value;
+          const hospital = hospitalInput ? hospitalInput.value : '';
+          const expense = parseFloat(expenseInput.value) || 0;
+          const future = futureInput ? parseFloat(futureInput.value) || 0 : 0;
+          
+          if (member && disease && expense > 0) {
+            if (expenseMedicalDetail) expenseMedicalDetail += '；';
+            expenseMedicalDetail += `${member}${date ? ' ' + date : ''}因${disease}在${hospital}就医，报销后自付${expense.toFixed(2)}元`;
+            expenseFutureTotal += future;
+          }
+        }
+      }
+      
+      // 获取支出信息 - 教育支出
+      let expenseEducationDetail = '';
+      for (let i = 1; i <= educationExpenseCount; i++) {
+        const studentSelect = document.getElementById('education' + i + '_student');
+        const schoolInput = document.getElementById('education' + i + '_school');
+        const expenseInput = document.getElementById('education' + i + '_expense');
+        
+        if (studentSelect && expenseInput) {
+          const student = studentSelect.value;
+          const schoolName = schoolInput ? schoolInput.value.trim() : '';
+          const expense = parseFloat(expenseInput.value) || 0;
+          
+          if (student && expense > 0) {
+            if (expenseEducationDetail) expenseEducationDetail += '；';
+            if (schoolName) {
+              expenseEducationDetail += `${student}就读于${schoolName}，教育支出${expense.toFixed(2)}元`;
+            } else {
+              expenseEducationDetail += `${student}教育支出${expense.toFixed(2)}元`;
+            }
+          }
+        }
+      }
+      
+      // 后续支出
+      let expenseFutureDetail = '';
+      if (expenseFutureTotal > 0) {
+        expenseFutureDetail = `预计后续治疗费用约${expenseFutureTotal.toFixed(2)}元`;
+      }
+      
+      // 自动生成生产经营收入明细
+      let businessDetail = '';
+      for (let i = 1; i <= businessCount; i++) {
+        const personInput = document.getElementById('business' + i + '_person');
+        const typeInput = document.getElementById('business' + i + '_type');
+        const otherTextInput = document.getElementById('business' + i + '_otherText');
+        const incomeInput = document.getElementById('business' + i + '_income');
+        const expenseInput = document.getElementById('business' + i + '_expense');
+        
+        if (personInput && typeInput) {
+          const person = personInput.value;
+          let type = typeInput.value;
+          // 如果选择"其他"，使用输入的文本
+          if (type === '其他' && otherTextInput) {
+            type = otherTextInput.value.trim() || '其他经营';
+          }
+          const income = incomeInput ? parseFloat(incomeInput.value) || 0 : 0;
+          const expense = expenseInput ? parseFloat(expenseInput.value) || 0 : 0;
+          const net = income - expense;
+          
+          if (person && type) {
+            if (businessDetail) businessDetail += '；';
+            businessDetail += `${person}${type}生产经营性净收入${formatAmount(net)}元`;
+          }
+        }
+      }
+      if (!businessDetail) businessDetail = '无';
+      
+      // 自动生成转移性收入明细
+      let transferIncomeDetail = '';
+      for (let i = 1; i <= transferIncomeCount; i++) {
+        const nameInput = document.getElementById('transfer' + i + '_name');
+        const typeInput = document.getElementById('transfer' + i + '_type');
+        const otherTextInput = document.getElementById('transfer' + i + '_otherText');
+        const amountInput = document.getElementById('transfer' + i + '_amount');
+        
+        if (nameInput && typeInput && amountInput) {
+          const name = nameInput.value.trim();
+          let type = typeInput.value;
+          // 如果选择"其他"，使用输入的文本
+          if (type === '其他' && otherTextInput) {
+            type = otherTextInput.value.trim() || '其他补贴';
+          }
+          const amount = parseFloat(amountInput.value) || 0;
+          
+          if (name && amount > 0) {
+            if (transferIncomeDetail) transferIncomeDetail += '，';
+            transferIncomeDetail += `${name}的${type}${amount.toFixed(2)}元`;
+          }
+        }
+      }
+      if (!transferIncomeDetail) transferIncomeDetail = '未填写';
+      
+      // 获取慎重纳入情形
+      const carefulSituationSelect = document.getElementById('carefulSituationSelect');
+      const carefulSituation = carefulSituationSelect ? carefulSituationSelect.value : '无';
+      const carefulSituationDetail = document.getElementById('carefulSituationDetail').value.trim();
+      
+      // 获取核实信息
+      let verificationText = '';
+      let actualSelfPay = 0;
+      
+      if (needVerification) {
+        // 计算总自付支出
+        let totalSelfPay = 0;
+        for (let i = 1; i <= medicalExpenseCount; i++) {
+          const expenseInput = document.getElementById('medical' + i + '_expense');
+          if (expenseInput) {
+            totalSelfPay += parseFloat(expenseInput.value) || 0;
+          }
+        }
+        
+        if (verificationType === 'deposit') {
+          // 存款支付
+          const depositSource = document.getElementById('depositSource') ? document.getElementById('depositSource').value.trim() : '';
+          const depositAmount = document.getElementById('depositAmount') ? parseFloat(document.getElementById('depositAmount').value) || 0 : 0;
+          
+          if (depositSource && depositAmount > 0) {
+            verificationText = `因${depositSource}的存款支付${depositAmount.toFixed(2)}元`;
+            actualSelfPay = totalSelfPay - depositAmount;
+          }
+        } else if (verificationType === 'proxy') {
+          // 亲朋代付
+          let proxyDetails = [];
+          let totalProxyAmount = 0;
+          
+          for (let i = 1; i <= proxyCount; i++) {
+            const nameInput = document.getElementById('proxy' + i + '_name');
+            const relationInput = document.getElementById('proxy' + i + '_relation');
+            const locationInput = document.getElementById('proxy' + i + '_location');
+            const incomeInput = document.getElementById('proxy' + i + '_income');
+            const amountInput = document.getElementById('proxy' + i + '_amount');
+            
+            if (nameInput && relationInput && amountInput) {
+              const name = nameInput.value.trim();
+              const relation = relationInput.value.trim();
+              const location = locationInput ? locationInput.value.trim() : '';
+              const income = incomeInput ? parseFloat(incomeInput.value) || 0 : 0;
+              const amount = parseFloat(amountInput.value) || 0;
+              
+              if (name && relation && amount > 0) {
+                proxyDetails.push(`${relation}${name}代付${amount.toFixed(2)}元（${name}于${location}务工收入${income.toFixed(2)}元）`);
+                totalProxyAmount += amount;
+              }
+            }
+          }
+          
+          if (proxyDetails.length > 0) {
+            verificationText = `其中${proxyDetails.join('，')}`;
+            actualSelfPay = totalSelfPay - totalProxyAmount;
+          }
+        }
+      }
+      
+      // 根据风险类型生成不同的文本
+      let report = '';
+      
+      if (currentRiskType === 'medical') {
+        // 医疗支出类模板
+        report = `1、经核查，该家庭共同生活人口${familySize}人，(${familyMembersText})；家庭现有劳动力${laborCount}人`;
+        
+        // 添加义务教育人数
+        if (compulsoryCount > 0) {
+          report += `；义务教育阶段${compulsoryCount}人`;
+        }
+        
+        report += `。\n\n`;
+        
+        // === 第 2 条：收入信息 ===
+        let hasIncomeContent = false;
+        let incomePart2 = '';
+        
+        // 务工收入
+        if (incomeWorkTotal > 0) {
+          incomePart2 += `工资性收入：${workIncomeDetail}`;
+          if (workIncomeCount > 1) {
+            incomePart2 += `，合计${formatAmount(incomeWorkTotal)}元`;
+          }
+          incomePart2 += `；`;
+          hasIncomeContent = true;
+        }
+        
+        // 生产经营性收入
+        if (incomeBusinessNet > 0) {
+          incomePart2 += `生产经营性收入：${businessDetail}`;
+          if (businessCount > 1) {
+            incomePart2 += `，合计净收入${formatAmount(incomeBusinessNet)}元`;
+          }
+          incomePart2 += `；`;
+          hasIncomeContent = true;
+        }
+        
+        // 财产性收入（为 0 时不显示）
+        if (incomePropertyTotal > 0) {
+          incomePart2 += `财产性收入${formatAmount(incomePropertyTotal)}元；`;
+          hasIncomeContent = true;
+        }
+        
+        // 转移性收入
+        if (incomeTransferTotal > 0) {
+          incomePart2 += `转移性收入${formatAmount(incomeTransferTotal)}元（${transferIncomeDetail}）。`;
+          hasIncomeContent = true;
+        }
+        
+        // 总收入和人均纯收入
+        if (hasIncomeContent) {
+          incomePart2 += `\n总收入${formatAmount(totalIncome)}元，人均纯收入${formatAmount(perCapitaIncome)}元。`;
+        }
+        
+        if (hasIncomeContent) {
+          report += `2、该户收入主要构成由${incomePart2}\n\n`;
+        }
+        
+        // === 第 3 条：支出信息 ===
+        let hasExpenseContent = false;
+        let expensePart3 = '';
+        
+        if (expenseMedicalDetail) {
+          if (verificationText) {
+            expensePart3 += `医疗支出：${expenseMedicalDetail}，${verificationText}。家庭实际自付支出${formatAmount(actualSelfPay)}元。`;
+          } else {
+            expensePart3 += `医疗支出：${expenseMedicalDetail}；`;
+          }
+          hasExpenseContent = true;
+        }
+        if (expenseEducationDetail) {
+          expensePart3 += `教育支出：${expenseEducationDetail}；`;
+          hasExpenseContent = true;
+        }
+        if (expenseFutureDetail) {
+          expensePart3 += `后续支出估算：${expenseFutureDetail}。`;
+          hasExpenseContent = true;
+        }
+        
+        if (hasExpenseContent) {
+          report += `3、该家庭合规自付支出情况。${expensePart3}\n`;
+        }
+        
+        // === 第 4 条：慎重纳入情形 ===
+        let hasCarefulContent = false;
+        let carefulPart4 = '';
+        
+        if (carefulSituation === '有' && carefulSituationDetail) {
+          carefulPart4 = `该家庭存在"慎重纳入情形"。${carefulSituationDetail}`;
+          hasCarefulContent = true;
+        }
+        
+        if (hasCarefulContent) {
+          // 如果前面有支出内容，这是第 4 条；否则是第 3 条
+          const partNumber = hasExpenseContent ? 4 : 3;
+          report += `${partNumber}、${carefulPart4}\n\n`;
+        } else {
+          report += `\n`;
+        }
+        
+        report = report.replace(/；\n/g, '\n').replace(/；；/g, '；');
+        
+        reportText = report;
+        
+      } else if (currentRiskType === 'lowIncome') {
+        // 新增低保类模板
+        const lowIncomeName = document.getElementById('lowIncomeNameNew').value.trim();
+        const lowIncomeDate = document.getElementById('lowIncomeDateNew').value;
+        const lowIncomeAmount = document.getElementById('lowIncomeAmountNew').value || '0';
+        const lowIncomeReason = document.getElementById('lowIncomeReasonNew').value.trim();
+        
+        report = `经核查，该户${lowIncomeName}${lowIncomeDate ? lowIncomeDate + ' ' : ''}因何纳入低保，低保金${lowIncomeAmount}元（${lowIncomeReason}）\n\n`;
+        
+        report += `1、经核查，该家庭共同生活人口${familySize}人，(${familyMembersText})；家庭现有劳动力${laborCount}人`;
+        
+        // 添加义务教育人数
+        if (compulsoryCount > 0) {
+          report += `；义务教育阶段${compulsoryCount}人`;
+        }
+        
+        report += `。\n\n`;
+        
+        // === 第 2 条：收入信息 ===
+        let hasIncomeContent = false;
+        let incomePart2 = '';
+        
+        // 务工收入
+        if (incomeWorkTotal > 0) {
+          incomePart2 += `工资性收入：${workIncomeDetail}`;
+          if (workIncomeCount > 1) {
+            incomePart2 += `，合计${formatAmount(incomeWorkTotal)}元`;
+          }
+          incomePart2 += `；`;
+          hasIncomeContent = true;
+        }
+        
+        // 生产经营性收入
+        if (incomeBusinessNet > 0) {
+          incomePart2 += `生产经营性收入：${businessDetail}`;
+          if (businessCount > 1) {
+            incomePart2 += `，合计净收入${formatAmount(incomeBusinessNet)}元`;
+          }
+          incomePart2 += `；`;
+          hasIncomeContent = true;
+        }
+        
+        // 财产性收入（为 0 时不显示）
+        if (incomePropertyTotal > 0) {
+          incomePart2 += `财产性收入${formatAmount(incomePropertyTotal)}元；`;
+          hasIncomeContent = true;
+        }
+        
+        // 转移性收入
+        if (incomeTransferTotal > 0) {
+          incomePart2 += `转移性收入${formatAmount(incomeTransferTotal)}元（${transferIncomeDetail}）。`;
+          hasIncomeContent = true;
+        }
+        
+        // 总收入和人均纯收入
+        if (hasIncomeContent) {
+          incomePart2 += `\n总收入${formatAmount(totalIncome)}元，人均纯收入${formatAmount(perCapitaIncome)}元。`;
+        }
+        
+        if (hasIncomeContent) {
+          report += `2、该户收入主要构成由${incomePart2}\n\n`;
+        }
+        
+        // === 第 3 条：支出信息 ===
+        let hasExpenseContent = false;
+        let expensePart3 = '';
+        
+        if (expenseMedicalDetail) {
+          if (verificationText) {
+            expensePart3 += `医疗支出：${expenseMedicalDetail}，${verificationText}。家庭实际自付支出${formatAmount(actualSelfPay)}元。`;
+          } else {
+            expensePart3 += `医疗支出：${expenseMedicalDetail}；`;
+          }
+          hasExpenseContent = true;
+        }
+        if (expenseEducationDetail) {
+          expensePart3 += `教育支出：${expenseEducationDetail}；`;
+          hasExpenseContent = true;
+        }
+        
+        if (hasExpenseContent) {
+          report += `3、该家庭合规自付支出情况。${expensePart3}\n`;
+        }
+        
+        // === 第 4 条：慎重纳入情形 ===
+        let hasCarefulContent = false;
+        let carefulPart4 = '';
+        
+        if (carefulSituation === '有' && carefulSituationDetail) {
+          carefulPart4 = `该家庭存在"慎重纳入情形"。${carefulSituationDetail}`;
+          hasCarefulContent = true;
+        }
+        
+        if (hasCarefulContent) {
+          // 如果前面有支出内容，这是第 4 条；否则是第 3 条
+          const partNumber = hasExpenseContent ? 4 : 3;
+          report += `${partNumber}、${carefulPart4}\n\n`;
+        } else {
+          report += `\n`;
+        }
+        
+        report = report.replace(/；\n/g, '\n').replace(/；；/g, '；');
+        
+        reportText = report;
+        
+      } else if (currentRiskType === 'housing') {
+        // 住房安全类模板
+        const housingAddress = document.getElementById('housingAddress').value.trim();
+        
+        if (housingAddress) {
+          report = `经核实，该户现居住在${housingAddress}，无住房安全风险。\n\n`;
+        } else {
+          report = `请填写当前家庭住址。\n\n`;
+        }
+        
+      } else if (currentRiskType === 'disability') {
+        // 新增残疾类模板
+        const disabilityName = document.getElementById('disabilityNameNew').value.trim();
+        const disabilityDate = document.getElementById('disabilityDateNew').value;
+        const disabilityLevel = document.getElementById('disabilityLevelNew').value;
+        const disabilityType = document.getElementById('disabilityTypeNew').value.trim();
+        const disabilityExpense = document.querySelector('input[name="disabilityExpenseNew"]:checked').value;
+        
+        const dateText = disabilityDate ? disabilityDate.replace('-', '年') + '月' : '某时';
+        
+        report = `经核查，该户${disabilityName}${dateText}鉴定为${disabilityLevel}${disabilityType ? disabilityType : ''}残疾，为${disabilityExpense}\n\n`;
+        
+        report += `1、该家庭共同生活人口${familySize}人，(${familyMembersText})；家庭现有劳动力${laborCount}人`;
+        
+        // 添加义务教育人数
+        if (compulsoryCount > 0) {
+          report += `；义务教育阶段${compulsoryCount}人`;
+        }
+        
+        report += `。\n\n`;
+        
+        // === 第 2 条：收入信息 ===
+        let hasIncomeContent = false;
+        let incomePart2 = '';
+        
+        // 务工收入
+        if (incomeWorkTotal > 0) {
+          incomePart2 += `工资性收入：${workIncomeDetail}`;
+          if (workIncomeCount > 1) {
+            incomePart2 += `，合计${formatAmount(incomeWorkTotal)}元`;
+          }
+          incomePart2 += `；`;
+          hasIncomeContent = true;
+        }
+        
+        // 生产经营性收入
+        if (incomeBusinessNet > 0) {
+          incomePart2 += `生产经营性收入：${businessDetail}`;
+          if (businessCount > 1) {
+            incomePart2 += `，合计净收入${formatAmount(incomeBusinessNet)}元`;
+          }
+          incomePart2 += `；`;
+          hasIncomeContent = true;
+        }
+        
+        // 财产性收入（为 0 时不显示）
+        if (incomePropertyTotal > 0) {
+          incomePart2 += `财产性收入${formatAmount(incomePropertyTotal)}元；`;
+          hasIncomeContent = true;
+        }
+        
+        // 转移性收入
+        if (incomeTransferTotal > 0) {
+          incomePart2 += `转移性收入${formatAmount(incomeTransferTotal)}元（${transferIncomeDetail}）。`;
+          hasIncomeContent = true;
+        }
+        
+        // 总收入和人均纯收入
+        if (hasIncomeContent) {
+          incomePart2 += `\n总收入${formatAmount(totalIncome)}元，人均纯收入${formatAmount(perCapitaIncome)}元。`;
+        }
+        
+        if (hasIncomeContent) {
+          report += `2、该户收入主要构成由${incomePart2}\n\n`;
+        }
+        
+        // === 第 3 条：支出信息 ===
+        let hasExpenseContent = false;
+        let expensePart3 = '';
+        
+        if (expenseMedicalDetail) {
+          if (verificationText) {
+            expensePart3 += `医疗支出：${expenseMedicalDetail}，${verificationText}。家庭实际自付支出${formatAmount(actualSelfPay)}元。`;
+          } else {
+            expensePart3 += `医疗支出：${expenseMedicalDetail}；`;
+          }
+          hasExpenseContent = true;
+        }
+        if (expenseEducationDetail) {
+          expensePart3 += `教育支出：${expenseEducationDetail}；`;
+          hasExpenseContent = true;
+        }
+        
+        if (hasExpenseContent) {
+          report += `3、该家庭合规自付支出情况。${expensePart3}\n`;
+        }
+        
+        // === 第 4 条：慎重纳入情形 ===
+        let hasCarefulContent = false;
+        let carefulPart4 = '';
+        
+        if (carefulSituation === '有' && carefulSituationDetail) {
+          carefulPart4 = `该家庭存在"慎重纳入情形"。${carefulSituationDetail}`;
+          hasCarefulContent = true;
+        }
+        
+        if (hasCarefulContent) {
+          // 如果前面有支出内容，这是第 4 条；否则是第 3 条
+          const partNumber = hasExpenseContent ? 4 : 3;
+          report += `${partNumber}、${carefulPart4}\n\n`;
+        } else {
+          report += `\n`;
+        }
+        
+        report = report.replace(/；\n/g, '\n').replace(/；；/g, '；');
+        
+      }
+      
+      // 显示文本
+      const reportTextArea = document.getElementById('reportText');
+      if (reportTextArea) {
+        reportTextArea.value = report;
+      } else {
+        console.error('错误：找不到 reportText 元素！');
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 13：showReport
+     * 功能：显示文本区域并滚动到该位置（只在点击生成按钮时调用）
+     * ================================================
+     */
+    function showReport() {
+      // 显示文本区域
+      const reportSection = document.getElementById('reportSection');
+      if (reportSection) {
+        reportSection.classList.remove('hidden-section');
+
+        // 滚动到文本区域
+        reportSection.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        console.error('错误：找不到 reportSection 元素！');
+      }
+    }
+
+    /**
+     * ================================================
+     * 函数 12：copyReport
+     * 功能：复制文本到剪贴板
+     * ================================================
+     */
+    function copyReport() {
+      const reportText = document.getElementById('reportText').value;
+      
+      if (!reportText || reportText === '请填写户主姓名后再生成文本...') {
+        alert('请先填写信息并生成文本！');
+        return;
+      }
+      
+      navigator.clipboard.writeText(reportText).then(function() {
+        // 按钮视觉反馈
+        const btn = document.querySelector('button[onclick="copyReport()"]');
+        if (btn) {
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '✅ 已复制！';
+          btn.classList.remove('bg-green-600');
+          btn.classList.add('bg-blue-600');
+          
+          setTimeout(function() {
+            btn.innerHTML = originalText;
+            btn.classList.remove('bg-blue-600');
+            btn.classList.add('bg-green-600');
+          }, 2000);
+        }
+        
+        alert('✅ 复制成功！\n\n请前往省平台粘贴文本。');
+        
+      }).catch(function(err) {
+        alert('❌ 复制失败，请手动选择文本内容复制。\n\n错误信息：' + err);
+      });
+    }
+
+    
+
+    /**
+     * ================================================
+     * 页面加载完成后的初始化
+     * ================================================
+     */
+    document.addEventListener('DOMContentLoaded', function() {
+      // 初始化月份输入框的限制
+      const monthInputs = document.querySelectorAll('input[type="month"]');
+      monthInputs.forEach(function(input) {
+        input.min = getOneYearAgo();
+        input.max = getCurrentYearMonth();
+      });
+    });
