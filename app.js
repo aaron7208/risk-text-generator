@@ -149,6 +149,12 @@
               <option value="残疾">残疾</option>
             </select>
           </div>
+
+          <!-- 具体病名/残疾种类（非健康时显示） -->
+          <div id="member${familyMemberCount}_diseaseSection" class="mb-3 hidden-section">
+            <label class="block text-xs text-gray-600 mb-1">具体病名/残疾种类</label>
+            <input type="text" id="member${familyMemberCount}_disease" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" placeholder="请输入具体病名或残疾种类（选填）" oninput="generateReport()">
+          </div>
         </div>
         
         <!-- 25 岁以下成员显示学生身份选择 -->
@@ -167,12 +173,6 @@
             <option value="义务教育">义务教育阶段</option>
             <option value="非义务教育">非义务教育阶段（高中、大学等）</option>
           </select>
-        </div>
-        
-        <!-- 学校名称（非义务教育阶段显示） -->
-        <div id="member${familyMemberCount}_schoolNameSection" class="mb-3 hidden-section">
-          <label class="block text-xs text-gray-600 mb-1">学校名称</label>
-          <input type="text" id="member${familyMemberCount}_schoolName" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg" placeholder="请输入学校名称" oninput="generateReport()">
         </div>
         
         <div class="grid grid-cols-2 gap-2">
@@ -209,6 +209,13 @@
               </select>
               <button onclick="hideMaritalStatus(${familyMemberCount})" class="px-2 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600" title="隐藏婚育状况">×</button>
             </div>
+          </div>
+
+          <div id="member${familyMemberCount}_pushSection" class="mt-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="member${familyMemberCount}_isPush" class="w-5 h-5 rounded border-gray-300 text-blue-600" onchange="handlePushMemberChange(${familyMemberCount}); generateReport()">
+              <span class="text-sm font-medium text-gray-700">推送人员</span>
+            </label>
           </div>
         </div>
       `;
@@ -1660,6 +1667,20 @@
       }
     }
 
+    function handlePushMemberChange(memberId) {
+      const checkbox = document.getElementById('member' + memberId + '_isPush');
+      if (checkbox && checkbox.checked) {
+        for (let i = 1; i <= familyMemberCount; i++) {
+          if (i !== memberId) {
+            const otherCheckbox = document.getElementById('member' + i + '_isPush');
+            if (otherCheckbox) {
+              otherCheckbox.checked = false;
+            }
+          }
+        }
+      }
+    }
+
     /**
      * ================================================
      * 函数 24：showMaritalStatus
@@ -2416,19 +2437,20 @@
       // 60-79 岁老年人群
       if (age >= 60) {
         if (health === '健康') {
+          // 60岁以上健康人员，需要下拉列表选择
           return {
-            laborType: '弱劳动力',
-            needsManualSelect: false,
-            manualOptions: [],
-            message: ''
+            laborType: '',
+            needsManualSelect: true,
+            manualOptions: ['弱劳动力', '无劳动力'],
+            message: '请选择劳动力类型'
           };
         } else if (health === '慢性病') {
-          // 60-79 岁慢性病
+          // 60岁以上慢性病：需要下拉列表选择
           return {
-            laborType: '弱劳动力或无劳动力（请用户在最终生成文本中自行选择）',
-            needsManualSelect: false,
-            manualOptions: [],
-            message: ''
+            laborType: '',
+            needsManualSelect: true,
+            manualOptions: ['弱劳动力', '无劳动力'],
+            message: '请选择劳动力类型'
           };
         } else {
           // 大病/残疾：无劳动力
@@ -2490,21 +2512,27 @@
         const isStudentSelect = document.getElementById('member' + i + '_isStudent');
         const studentSection = document.getElementById('member' + i + '_studentSection');
         const educationStageSection = document.getElementById('member' + i + '_educationStageSection');
-        const schoolNameSection = document.getElementById('member' + i + '_schoolNameSection');
-        
+        const diseaseSection = document.getElementById('member' + i + '_diseaseSection');
+
         if (!ageInput || !healthSelect || !laborInput) continue;
-        
+
         const age = parseInt(ageInput.value) || 0;
         const health = healthSelect ? healthSelect.value : '健康';
         const isStudent = isStudentSelect ? isStudentSelect.value : '否';
-        
+
+        // === 处理具体病名/残疾种类字段显示 ===
+        if (health !== '健康' && age > 0) {
+          if (diseaseSection) diseaseSection.classList.remove('hidden-section');
+        } else {
+          if (diseaseSection) diseaseSection.classList.add('hidden-section');
+        }
+
         // === 第 1 步：处理学生相关字段显示 ===
-        
-        // 14 岁以下：隐藏所有学生字段，默认义务教育阶段
+
+        // 14 岁以下：隐藏学生字段，默认义务教育阶段
         if (age > 0 && age < 14) {
           if (studentSection) studentSection.classList.add('hidden-section');
           if (educationStageSection) educationStageSection.classList.add('hidden-section');
-          if (schoolNameSection) schoolNameSection.classList.add('hidden-section');
           studentCount++; // 默认义务教育阶段
         }
         // 14-25 岁：显示学生选择
@@ -2512,35 +2540,19 @@
           if (studentSection && isStudentSelect) {
             studentSection.classList.remove('hidden-section');
           }
-          
+
           // 选择"是"显示教育阶段
           if (educationStageSection && isStudent === '是') {
             educationStageSection.classList.remove('hidden-section');
             studentCount++;
-            
-            const educationStage = document.getElementById('member' + i + '_educationStage');
-            if (educationStage) {
-              const stage = educationStage.value;
-              // 非义务教育显示学校名称
-              if (schoolNameSection && stage === '非义务教育') {
-                schoolNameSection.classList.remove('hidden-section');
-                nonCompulsoryCount++;
-              } else if (schoolNameSection) {
-                schoolNameSection.classList.add('hidden-section');
-              }
-            }
           } else if (educationStageSection) {
             educationStageSection.classList.add('hidden-section');
-            if (schoolNameSection) {
-              schoolNameSection.classList.add('hidden-section');
-            }
           }
         }
         // 25 岁以上：隐藏所有学生字段
         else {
           if (studentSection) studentSection.classList.add('hidden-section');
           if (educationStageSection) educationStageSection.classList.add('hidden-section');
-          if (schoolNameSection) schoolNameSection.classList.add('hidden-section');
         }
         
         // === 第 2 步：判断劳动力类型 ===
@@ -2557,6 +2569,16 @@
           laborInput.classList.add('hidden-section');
           if (laborSelect) {
             laborSelect.classList.remove('hidden-section');
+            // 动态设置下拉选项
+            laborSelect.innerHTML = '<option value="">请选择</option>';
+            if (result.manualOptions && result.manualOptions.length > 0) {
+              result.manualOptions.forEach(function(opt) {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                laborSelect.appendChild(option);
+              });
+            }
             // 如果用户还没有选择，则重置；已选择则保持
             if (!currentSelectedValue) {
               laborSelect.value = '';
@@ -2633,13 +2655,13 @@
       let studentCount = 0; // 在校学生总数
       let compulsoryCount = 0; // 义务教育阶段
       let nonCompulsoryCount = 0; // 非义务教育阶段
-      let nonCompulsorySchools = []; // 非义务教育学校名称
-      
+      let nonCompulsorySchools = []; // 非义务教育学校名称（仅用于下拉显示）
+
       for (let i = 1; i <= familyMemberCount; i++) {
         const isStudentSelect = document.getElementById('member' + i + '_isStudent');
         const educationStage = document.getElementById('member' + i + '_educationStage');
         const schoolName = document.getElementById('member' + i + '_schoolName');
-        
+
         if (isStudentSelect && isStudentSelect.value === '是') {
           studentCount++;
           if (educationStage) {
@@ -2647,14 +2669,12 @@
               compulsoryCount++;
             } else if (educationStage.value === '非义务教育') {
               nonCompulsoryCount++;
-              if (schoolName && schoolName.value.trim()) {
-                nonCompulsorySchools.push(schoolName.value.trim());
-              }
+              // 收集学校名称用于下拉选项显示（家庭成员卡片的学校名已删除，此处不再收集）
             }
           }
         }
       }
-      
+
       return {
         studentCount: studentCount,
         compulsoryCount: compulsoryCount,
@@ -2784,57 +2804,75 @@
       // 先计算
       calculateTotals();
       calculateLaborAbility();
-      
+
       // 获取家庭成员信息
       let familyMembersText = '';
       let familySize = 0;
       let laborCount = 0;
       let householderName = '';
-      
+      let pushMemberName = '';
+      let pushMemberHealth = '';
+
       // 遍历家庭成员，查找户主并构建家庭成员文本
       for (let i = 1; i <= familyMemberCount; i++) {
         const nameInput = document.getElementById('member' + i + '_name');
         const relationInput = document.getElementById('member' + i + '_relation');
         const ageInput = document.getElementById('member' + i + '_age');
         const laborInput = document.getElementById('member' + i + '_labor');
-        
+        const pushInput = document.getElementById('member' + i + '_isPush');
+
         if (!nameInput || !relationInput || !ageInput || !laborInput) continue;
-        
+
         const name = nameInput.value.trim();
         let relation = relationInput.value;
         const age = parseInt(ageInput.value) || 0;
         const labor = laborInput.value;
+        const isPush = pushInput ? pushInput.checked : false;
         // 获取健康状况
         const healthInput = document.getElementById('member' + i + '_health');
         const health = healthInput ? healthInput.value : '健康';
+        // 获取具体病名/残疾种类
+        const diseaseInput = document.getElementById('member' + i + '_disease');
+        const disease = diseaseInput ? diseaseInput.value.trim() : '';
         // 获取婚育状况
         const maritalInput = document.getElementById('member' + i + '_marital');
         const marital = (maritalInput && maritalInput.value) ? maritalInput.value : '';
-        
+
+        // 记录推送人员信息
+        if (isPush && name) {
+          pushMemberName = name;
+          pushMemberHealth = health;
+        }
+
         if (name && age > 0) {
           familySize++;
-          
+
+          // 构建健康显示文本（有病名时附加）
+          const healthDisplay = disease ? `${health}（${disease}）` : health;
+          // 推送人员非健康时添加恢复说明
+          const healthText = (isPush && health !== '健康') ? '，目前病人恢复良好，能够自理' : '';
+
           if (relation === '户主') {
             householderName = name;
             // 户主信息放在最前面
             if (labor && labor.includes('劳动力') && !labor.includes('无')) {
               laborCount++;
             }
-            familyMembersText = `户主${name}${age}岁，${health}，${marital ? marital + '，' : ''}${labor}`;
+            familyMembersText = `户主${name}${age}岁，${healthDisplay}${healthText}，${marital ? marital + '，' : ''}${labor}`;
           } else {
             // 其他家庭成员
             if (labor && labor.includes('劳动力') && !labor.includes('无')) {
               laborCount++;
             }
             if (familyMembersText) {
-              familyMembersText += `，${relation}${name}${age}岁，${health}，${marital ? marital + '，' : ''}${labor}`;
+              familyMembersText += `，${relation}${name}${age}岁，${healthDisplay}${healthText}，${marital ? marital + '，' : ''}${labor}`;
             } else {
-              familyMembersText = `${relation}${name}${age}岁，${health}，${marital ? marital + '，' : ''}${labor}`;
+              familyMembersText = `${relation}${name}${age}岁，${healthDisplay}${healthText}，${marital ? marital + '，' : ''}${labor}`;
             }
           }
         }
       }
-      
+
       // 如果户主姓名未填写，不生成文本
       if (!householderName) {
         const reportText = document.getElementById('reportText');
@@ -2871,32 +2909,39 @@
         const endTimeInput = document.getElementById('work' + i + '_endTime');
         const industryInput = document.getElementById('work' + i + '_industry');
         const amountInput = document.getElementById('work' + i + '_amount');
-        
+        const durationSpan = document.getElementById('work' + i + '_duration');
+
         if (nameInput && provinceInput && amountInput) {
           const name = nameInput.value.trim();
           const province = provinceInput.value;
           const city = cityInput ? cityInput.value : '';
-          // 只有四川省内才获取县区字段
           const district = (province === '四川省' && districtSection) ? document.getElementById('work' + i + '_district').value : '';
           const startTime = startTimeInput ? startTimeInput.value : '';
           const endTime = endTimeInput ? endTimeInput.value : '';
           const industry = industryInput ? industryInput.value.trim() : '';
           const amount = parseFloat(amountInput.value) || 0;
-          
+          const duration = durationSpan ? parseInt(durationSpan.textContent) || 0 : 0;
+
           if (name && province && amount > 0) {
             if (workIncomeDetail) workIncomeDetail += '；';
-            
-            // 构建时间文本
+
+            // 构建时间文本：不满12个月才显示（基于实际时间跨度计算）
             let timeText = '';
             if (startTime && endTime) {
-              timeText = `${startTime.replace('-', '年')}月 至 ${endTime.replace('-', '年')}月`;
+              const startDate = new Date(startTime);
+              const endDate = new Date(endTime);
+              const actualMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                                  (endDate.getMonth() - startDate.getMonth()) + 1;
+              if (actualMonths < 12) {
+                timeText = `${startTime.replace('-', '年')}月 至 ${endTime.replace('-', '年')}月`;
+              }
             }
-            
+
             // 构建地点文本
             let locationText = province;
             if (city) locationText += city;
             if (district) locationText += district;
-            
+
             // 构建完整文本
             workIncomeDetail += `${name}${timeText ? ' ' + timeText : ''}在${locationText}${industry ? '从事' + industry : ''}，扣除必要务工成本后收入${formatAmount(amount)}元`;
           }
@@ -3094,7 +3139,12 @@
         if (compulsoryCount > 0) {
           report += `；义务教育阶段${compulsoryCount}人`;
         }
-        
+
+        // 添加推送人员信息（非健康时）
+        if (pushMemberName && pushMemberHealth !== '健康') {
+          report += `；${pushMemberName}目前病人恢复良好，能够自理`;
+        }
+
         report += `。\n\n`;
         
         // === 第 2 条：收入信息 ===
@@ -3172,7 +3222,7 @@
         let carefulPart4 = '';
         
         if (carefulSituation === '有' && carefulSituationDetail) {
-          carefulPart4 = `该家庭存在"慎重纳入情形"。${carefulSituationDetail}`;
+          carefulPart4 = `${carefulSituationDetail}`;
           hasCarefulContent = true;
         }
         
@@ -3196,14 +3246,19 @@
         const lowIncomeReason = document.getElementById('lowIncomeReasonNew').value.trim();
         
         report = `经核查，该户${lowIncomeName}${lowIncomeDate ? lowIncomeDate + ' ' : ''}因何纳入低保，低保金${lowIncomeAmount}元（${lowIncomeReason}）\n\n`;
-        
+
         report += `1、经核查，该家庭共同生活人口${familySize}人，(${familyMembersText})；家庭现有劳动力${laborCount}人`;
-        
+
         // 添加义务教育人数
         if (compulsoryCount > 0) {
           report += `；义务教育阶段${compulsoryCount}人`;
         }
-        
+
+        // 添加推送人员信息（非健康时）
+        if (pushMemberName && pushMemberHealth !== '健康') {
+          report += `；${pushMemberName}目前病人恢复良好，能够自理`;
+        }
+
         report += `。\n\n`;
         
         // === 第 2 条：收入信息 ===
@@ -3277,7 +3332,7 @@
         let carefulPart4 = '';
         
         if (carefulSituation === '有' && carefulSituationDetail) {
-          carefulPart4 = `该家庭存在"慎重纳入情形"。${carefulSituationDetail}`;
+          carefulPart4 = `${carefulSituationDetail}`;
           hasCarefulContent = true;
         }
         
@@ -3312,16 +3367,21 @@
         const disabilityExpense = document.querySelector('input[name="disabilityExpenseNew"]:checked').value;
         
         const dateText = disabilityDate ? disabilityDate.replace('-', '年') + '月' : '某时';
-        
-        report = `经核查，该户${disabilityName}${dateText}鉴定为${disabilityLevel}${disabilityType ? disabilityType : ''}残疾，为${disabilityExpense}\n\n`;
-        
+
+        report = `经核查，该户${disabilityName}${dateText}鉴定为${disabilityLevel}${disabilityType ? disabilityType : ''}残疾\n\n`;
+
         report += `1、该家庭共同生活人口${familySize}人，(${familyMembersText})；家庭现有劳动力${laborCount}人`;
-        
+
         // 添加义务教育人数
         if (compulsoryCount > 0) {
           report += `；义务教育阶段${compulsoryCount}人`;
         }
-        
+
+        // 添加推送人员信息（非健康时）
+        if (pushMemberName && pushMemberHealth !== '健康') {
+          report += `；${pushMemberName}目前病人恢复良好，能够自理`;
+        }
+
         report += `。\n\n`;
         
         // === 第 2 条：收入信息 ===
@@ -3395,7 +3455,7 @@
         let carefulPart4 = '';
         
         if (carefulSituation === '有' && carefulSituationDetail) {
-          carefulPart4 = `该家庭存在"慎重纳入情形"。${carefulSituationDetail}`;
+          carefulPart4 = `${carefulSituationDetail}`;
           hasCarefulContent = true;
         }
         
