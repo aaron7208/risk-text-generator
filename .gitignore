@@ -1,0 +1,12 @@
+# 忽略配置文件（包含API Key）
+config.js
+
+# 忽略IDE和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 忽略操作系统文件
+.DS_Store
+Thumbs.db

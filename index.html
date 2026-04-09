@@ -517,13 +517,22 @@
         </button>
         
         <!-- 复制文本按钮 -->
-        <button 
-          onclick="copyReport()" 
+        <button
+          onclick="copyReport()"
           class="w-full bg-green-600 text-white px-6 py-4 rounded-xl text-xl font-bold shadow-md active:scale-98 active:opacity-90 transition-colors"
         >
            复制文本
         </button>
-        
+
+        <!-- LLM审核按钮 -->
+        <button
+          id="btnLLMReview"
+          onclick="startLLMReview()"
+          class="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-4 rounded-xl text-xl font-bold shadow-md active:scale-98 active:opacity-90 transition-colors hidden-section"
+        >
+           🤖 LLM审核
+        </button>
+
         <!-- 刷新页面按钮 -->
         <button 
           onclick="location.reload()" 
@@ -572,6 +581,52 @@
         placeholder="请填写完信息后，点击'生成/刷新文本'按钮..."
       ></textarea>
       <p class="text-xs text-gray-500 mt-2">💡 提示：您可以直接在此文本框内修改内容，修改后可再次点击"复制文本"按钮。</p>
+    </div>
+  </div>
+
+  <!-- LLM审核对比区域（初始隐藏） -->
+  <div id="llmCompareSection" class="max-w-2xl mx-auto p-4 mb-24 hidden-section">
+    <div class="bg-white rounded-xl shadow-lg p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-gray-800">🤖 LLM审核结果</h2>
+        <button onclick="closeLLMCompare()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+      </div>
+
+      <!-- 对比表格 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <h3 class="font-semibold text-gray-700 mb-2">📝 原文本</h3>
+          <textarea
+            id="originalTextCompare"
+            class="w-full h-48 px-3 py-2 border-2 border-blue-300 rounded-lg text-sm resize-none bg-blue-50"
+            readonly
+          ></textarea>
+        </div>
+        <div>
+          <h3 class="font-semibold text-gray-700 mb-2">✨ LLM优化文本</h3>
+          <textarea
+            id="llmTextCompare"
+            class="w-full h-48 px-3 py-2 border-2 border-purple-300 rounded-lg text-sm resize-none bg-purple-50"
+            readonly
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- 差异说明 -->
+      <div id="llmDiffSection" class="mb-4 hidden-section">
+        <h3 class="font-semibold text-gray-700 mb-2">📋 主要差异</h3>
+        <div id="llmDiffContent" class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-sm text-gray-700 max-h-40 overflow-y-auto"></div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="flex gap-3">
+        <button onclick="useLLMText()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors">
+          ✨ 使用LLM文本
+        </button>
+        <button onclick="keepOriginalText()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors">
+          📝 保留原文本
+        </button>
+      </div>
     </div>
   </div>
 
@@ -755,19 +810,28 @@
         </div>
         
         <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs text-gray-600 mb-1">劳动力情况（自动生成）</label>
-            <textarea 
-              id="member${familyMemberCount}_labor" 
-              class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-sm" 
-              readonly 
-              onfocus="this.blur()" 
+          <div id="member${familyMemberCount}_laborContainer">
+            <label class="block text-xs text-gray-600 mb-1">劳动力情况</label>
+            <textarea
+              id="member${familyMemberCount}_labor"
+              class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg bg-gray-100 text-sm"
+              readonly
+              onfocus="this.blur()"
               placeholder="将根据年龄和健康状况自动生成"
               rows="2"
               style="resize: none; line-height: 1.4;"
             ></textarea>
+            <select
+              id="member${familyMemberCount}_laborSelect"
+              class="w-full px-3 py-2 border-2 border-blue-400 rounded-lg text-sm hidden-section"
+              onchange="selectLaborType(${familyMemberCount}, this.value)"
+            >
+              <option value="">请选择</option>
+              <option value="弱劳动力">弱劳动力</option>
+              <option value="丧失劳动力">丧失劳动力</option>
+            </select>
           </div>
-          
+
           <div id="member${familyMemberCount}_maritalSection" class="hidden-section">
             <label class="block text-xs text-gray-600 mb-1">婚育状况</label>
             <div class="flex gap-1">
@@ -2934,10 +2998,10 @@
      * 规则说明：
      * - <14 岁：无劳动力
      * - 14-25 岁在校学生：无劳动力
-     * - 18-59 岁健康：普通劳动力
-     * - 18-59 岁非健康：弱劳动力或丧失劳动力（请用户在最终生成文本中自行选择）
+     * - 16-59 岁健康非在校：普通劳动力（自动）
+     * - 16-59 岁非健康非在校：弱劳动力或丧失劳动力（需用户选择）
      * - 60-79 岁健康：弱劳动力
-     * - 60-79 岁慢性病：弱劳动力或无劳动力（请用户在最终生成文本中自行选择）
+     * - 60-79 岁慢性病：弱劳动力或无劳动力
      * - 60-79 岁大病/残疾：无劳动力
      * - ≥80 岁：无劳动力
      * ================================================
@@ -3011,8 +3075,8 @@
         }
       }
       
-      // 18-59 岁成年人群
-      if (age >= 18) {
+      // 16-59 岁成年人群
+      if (age >= 16) {
         if (health === '健康') {
           return {
             laborType: '普通劳动力',
@@ -3021,19 +3085,19 @@
             message: ''
           };
         } else {
-          // 慢性病/大病/残疾
+          // 慢性病/大病/残疾：需要用户在 UI 上选择弱劳动力或丧失劳动力
           return {
-            laborType: '弱劳动力或丧失劳动力（请用户在最终生成文本中自行选择）',
-            needsManualSelect: false,
-            manualOptions: [],
-            message: ''
+            laborType: '',
+            needsManualSelect: true,
+            manualOptions: ['弱劳动力', '丧失劳动力'],
+            message: '请选择劳动力类型'
           };
         }
       }
-      
-      // 14-17 岁非在校学生：默认普通劳动力（特殊情况）
+
+      // 14-15 岁非在校学生：无劳动力（特殊处理）
       return {
-        laborType: '普通劳动力',
+        laborType: '无劳动力',
         needsManualSelect: false,
         manualOptions: [],
         message: ''
@@ -3118,13 +3182,34 @@
         const result = determineLaborType(age, health, isStudent);
         
         // === 第 3 步：设置劳动力情况 ===
-        
-        if (result.laborType) {
-          // 有判定结果，直接设置
-          laborInput.value = result.laborType;
-        } else if (result.message) {
-          // 需要提示信息
-          laborInput.value = result.message;
+
+        const laborSelect = document.getElementById('member' + i + '_laborSelect');
+        const currentSelectedValue = laborSelect ? laborSelect.value : '';
+
+        if (result.needsManualSelect) {
+          // 需要用户手动选择：显示下拉框，隐藏 textarea
+          laborInput.classList.add('hidden-section');
+          if (laborSelect) {
+            laborSelect.classList.remove('hidden-section');
+            // 如果用户还没有选择，则重置；已选择则保持
+            if (!currentSelectedValue) {
+              laborSelect.value = '';
+            } else {
+              // 用户已选择，将值同步到 laborInput
+              laborInput.value = currentSelectedValue;
+            }
+          }
+        } else {
+          // 自动判定：显示 textarea，隐藏下拉框
+          laborInput.classList.remove('hidden-section');
+          if (laborSelect) {
+            laborSelect.classList.add('hidden-section');
+          }
+          if (result.laborType) {
+            laborInput.value = result.laborType;
+          } else if (result.message) {
+            laborInput.value = result.message;
+          }
         }
       }
       
@@ -3135,6 +3220,21 @@
         expenseEducationSection.classList.remove('hidden-section');
       } else if (expenseEducationSection) {
         expenseEducationSection.classList.add('hidden-section');
+      }
+    }
+
+    /**
+     * ================================================
+     * 辅助函数：selectLaborType
+     * 功能：用户选择劳动力类型后，将选择写入 laborInput 并触发文本生成
+     * 参数：memberId - 成员 ID，value - 选择的劳动力类型
+     * ================================================
+     */
+    function selectLaborType(memberId, value) {
+      const laborInput = document.getElementById('member' + memberId + '_labor');
+      if (laborInput && value) {
+        laborInput.value = value;
+        generateReport();
       }
     }
 
@@ -3965,7 +4065,13 @@
       const reportSection = document.getElementById('reportSection');
       if (reportSection) {
         reportSection.classList.remove('hidden-section');
-        
+
+        // 显示LLM审核按钮
+        const btnLLMReview = document.getElementById('btnLLMReview');
+        if (btnLLMReview) {
+          btnLLMReview.classList.remove('hidden-section');
+        }
+
         // 滚动到文本区域
         reportSection.scrollIntoView({ behavior: 'smooth' });
       } else {
@@ -4008,6 +4114,335 @@
       }).catch(function(err) {
         alert('❌ 复制失败，请手动选择文本内容复制。\n\n错误信息：' + err);
       });
+    }
+
+    /**
+     * ================================================
+     * LLM审核功能
+     * ================================================
+     */
+
+    /**
+     * 获取API Key（从localStorage）
+     */
+    function getAPIKey() {
+      return localStorage.getItem('llm_api_key') || '';
+    }
+
+    /**
+     * 保存API Key到localStorage
+     */
+    function saveAPIKey(apiKey) {
+      localStorage.setItem('llm_api_key', apiKey);
+    }
+
+    /**
+     * 开始LLM审核流程
+     */
+    function startLLMReview() {
+      const originalText = document.getElementById('reportText').value;
+
+      if (!originalText || originalText.includes('请先填写信息并生成文本') || originalText.includes('请先添加户主信息')) {
+        alert('请先生成文本后再进行LLM审核！');
+        return;
+      }
+
+      // 构建URL参数
+      const params = new URLSearchParams({
+        text: encodeURIComponent(originalText),
+        riskType: currentRiskType
+      });
+
+      // 在新标签页打开审核页面
+      window.open('review.html?' + params.toString(), '_blank');
+    }
+
+    /**
+     * 监听来自review.html的消息
+     */
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'llmResult') {
+        if (event.data.used && event.data.llmText) {
+          // 用户选择了LLM文本
+          document.getElementById('reportText').value = event.data.llmText;
+          alert('✅ 已使用LLM优化后的文本！');
+        }
+        // 如果不是用LLM文本，则保持原文本不变
+      }
+    });
+
+    /**
+     * 显示API Key输入对话框
+     */
+    function showAPIKeyInputDialog() {
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      overlay.id = 'apiKeyOverlay';
+
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+          <div class="text-center mb-4">
+            <div class="text-6xl mb-2">🔑</div>
+            <h3 class="text-xl font-bold text-gray-800">配置LLM API Key</h3>
+            <p class="text-sm text-gray-600 mt-2">请输入您的百炼平台API Key</p>
+          </div>
+
+          <div class="mb-4">
+            <input
+              type="password"
+              id="apiKeyInput"
+              class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg"
+              placeholder="请输入API Key"
+            >
+            <p class="text-xs text-gray-500 mt-2">💡 您的API Key将保存在本地浏览器中，不会上传到任何服务器</p>
+          </div>
+
+          <div class="flex gap-3">
+            <button
+              onclick="saveAPIKeyAndStart()"
+              class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-semibold transition-colors"
+            >
+              确认并开始审核
+            </button>
+            <button
+              onclick="closeAPIKeyDialog()"
+              class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-3 rounded-xl font-semibold transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+    }
+
+    /**
+     * 保存API Key并开始审核
+     */
+    function saveAPIKeyAndStart() {
+      const apiKeyInput = document.getElementById('apiKeyInput');
+      const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+
+      if (!apiKey) {
+        alert('请输入API Key！');
+        return;
+      }
+
+      saveAPIKey(apiKey);
+      closeAPIKeyDialog();
+      performLLMReview(apiKey);
+    }
+
+    /**
+     * 关闭API Key对话框
+     */
+    function closeAPIKeyDialog() {
+      const overlay = document.getElementById('apiKeyOverlay');
+      if (overlay) {
+        overlay.remove();
+      }
+    }
+
+    /**
+     * 执行LLM审核
+     */
+    function performLLMReview(apiKey) {
+      const originalText = document.getElementById('reportText').value;
+
+      if (!originalText || originalText.includes('请先填写信息并生成文本') || originalText.includes('请先添加户主信息')) {
+        alert('请先生成文本后再进行LLM审核！');
+        return;
+      }
+
+      // 显示加载状态
+      const btnLLMReview = document.getElementById('btnLLMReview');
+      if (btnLLMReview) {
+        btnLLMReview.disabled = true;
+        btnLLMReview.innerHTML = '⏳ LLM审核中...';
+      }
+
+      // 获取风险类型描述
+      const riskTypeNames = {
+        'medical': '医疗支出类',
+        'lowIncome': '新增低保类',
+        'housing': '住房安全类',
+        'disability': '新增残疾类'
+      };
+      const riskTypeName = riskTypeNames[currentRiskType] || '未知类型';
+
+      // 构建prompt
+      const prompt = `你是一位防返贫监测工作人员，请对以下风险线索核实情况进行文本审核和优化。
+
+【风险类型】${riskTypeName}
+
+【原始文本】
+${originalText}
+
+【审核要求】
+1. 检查文本是否规范、完整、逻辑清晰
+2. 优化表达方式，使文本更加规范专业
+3. 保持原文的核心信息和数据不变
+4. 如果发现问题，给出修改建议
+
+请直接输出优化后的文本，不要解释，不要说明，直接给出优化结果。`;
+
+      // 调用百炼API
+      callLLMAPI(apiKey, prompt, function(llmText) {
+        // 恢复按钮状态
+        if (btnLLMReview) {
+          btnLLMReview.disabled = false;
+          btnLLMReview.innerHTML = '🤖 LLM审核';
+        }
+
+        if (llmText) {
+          showLLMCompare(originalText, llmText);
+        }
+      }, function(error) {
+        // 恢复按钮状态
+        if (btnLLMReview) {
+          btnLLMReview.disabled = false;
+          btnLLMReview.innerHTML = '🤖 LLM审核';
+        }
+        alert('LLM审核失败：' + error);
+      });
+    }
+
+    /**
+     * 调用百炼API
+     */
+    function callLLMAPI(apiKey, prompt, successCallback, errorCallback) {
+      const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+
+      const requestData = {
+        model: 'qwen-plus',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7
+      };
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify(requestData)
+      })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('API请求失败：' + response.status);
+        }
+        return response.json();
+      })
+      .then(function(data) {
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+          const llmText = data.choices[0].message.content.trim();
+          successCallback(llmText);
+        } else if (data.error) {
+          errorCallback(data.error.message || 'API返回错误');
+        } else {
+          errorCallback('无法解析API返回结果');
+        }
+      })
+      .catch(function(err) {
+        errorCallback(err.message || '网络错误');
+      });
+    }
+
+    /**
+     * 显示LLM对比结果
+     */
+    function showLLMCompare(originalText, llmText) {
+      // 填充文本
+      document.getElementById('originalTextCompare').value = originalText;
+      document.getElementById('llmTextCompare').value = llmText;
+
+      // 计算差异
+      const diff = calculateTextDiff(originalText, llmText);
+      const diffSection = document.getElementById('llmDiffSection');
+      const diffContent = document.getElementById('llmDiffContent');
+
+      if (diff && diff.length > 0) {
+        diffContent.innerHTML = diff.join('<br>');
+        diffSection.classList.remove('hidden-section');
+      } else {
+        diffSection.classList.add('hidden-section');
+      }
+
+      // 显示对比区域
+      const llmCompareSection = document.getElementById('llmCompareSection');
+      if (llmCompareSection) {
+        llmCompareSection.classList.remove('hidden-section');
+        llmCompareSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    /**
+     * 计算文本差异（简单实现）
+     */
+    function calculateTextDiff(original, llm) {
+      const differences = [];
+
+      if (original === llm) {
+        differences.push('文本未发生改变');
+        return differences;
+      }
+
+      // 简单对比：检查长度变化
+      if (llm.length > original.length) {
+        differences.push('✅ LLM对文本进行了扩充优化');
+      } else if (llm.length < original.length) {
+        differences.push('✅ LLM对文本进行了精简优化');
+      }
+
+      // 检查关键差异
+      const originalLines = original.split(/[，。；\n]/);
+      const llmLines = llm.split(/[，。；\n]/);
+
+      if (llmLines.length > originalLines.length) {
+        differences.push('✅ 增加了' + (llmLines.length - originalLines.length) + '处表述优化');
+      }
+
+      // 检查标点规范化
+      if (llm.includes('，') && !llm.includes('， ')) {
+        differences.push('✅ 已规范化使用中文标点');
+      }
+
+      return differences;
+    }
+
+    /**
+     * 使用LLM文本
+     */
+    function useLLMText() {
+      const llmText = document.getElementById('llmTextCompare').value;
+      if (llmText) {
+        document.getElementById('reportText').value = llmText;
+        closeLLMCompare();
+        alert('✅ 已使用LLM优化后的文本！');
+      }
+    }
+
+    /**
+     * 保留原文本
+     */
+    function keepOriginalText() {
+      closeLLMCompare();
+    }
+
+    /**
+     * 关闭LLM对比区域
+     */
+    function closeLLMCompare() {
+      const llmCompareSection = document.getElementById('llmCompareSection');
+      if (llmCompareSection) {
+        llmCompareSection.classList.add('hidden-section');
+      }
     }
 
     /**
